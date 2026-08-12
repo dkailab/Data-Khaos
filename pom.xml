@@ -11,7 +11,7 @@
 
     <name>Data Khaos</name>
     <description>国产化大数据基础设施全栈平台</description>
-    <url>https://github.com/pmdream/data-khaos</url>
+    <url>https://github.com/dkailab/Data-Khaos</url>
 
     <licenses>
         <license>
@@ -22,8 +22,8 @@
 
     <developers>
         <developer>
-            <name>pmdream</name>
-            <email>pmdream@datakhaos.com</email>
+            <name>dkailab</name>
+            <email>dkailab@datakhaos.com</email>
         </developer>
     </developers>
 

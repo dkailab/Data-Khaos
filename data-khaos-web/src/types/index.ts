@@ -428,25 +428,93 @@ export interface VisualDashboard {
   description?: string
   layout?: string
   refreshInterval?: number
+  /** 0:停用 1:草稿 2:已上线 */
   status?: number
+  /** 当前版本号 */
+  version?: number
   createBy?: string
   createTime?: string
   updateTime?: string
 }
 
+/** 组件图表类型 */
+export type ChartType =
+  | 'BAR'
+  | 'LINE'
+  | 'PIE'
+  | 'SCATTER'
+  | 'HEATMAP'
+  | 'AREA'
+  | 'GAUGE'
+  | 'TREEMAP'
+  | 'BOXPLOT'
+  | 'MAP'
+  | 'TABLE'
+  | 'NUMBER'
+
 export interface VisualDashboardItem {
   id?: string
   dashboardId?: string
+  /** 所属分析板ID */
+  boardId?: string
   title?: string
-  /** BAR / LINE / PIE / TABLE / NUMBER */
-  chartType?: string
+  /** BAR / LINE / PIE / SCATTER / HEATMAP / AREA / GAUGE / TREEMAP / BOXPLOT / MAP / TABLE / NUMBER */
+  chartType?: ChartType
   datasourceId?: string
   querySql?: string
+  /** 下钻明细SQL（可选，配置后点击图表下钻） */
+  drillSql?: string
+  /** 组件配置(JSON)：xAxisColumn / seriesColumn / valueColumn / mapName 等 */
   config?: string
   posX?: number
   posY?: number
   width?: number
   height?: number
+  createTime?: string
+}
+
+export interface VisualDashboardVersion {
+  id?: string
+  dashboardId?: string
+  version?: number
+  name?: string
+  description?: string
+  layout?: string
+  refreshInterval?: number
+  /** 组件快照(JSON数组字符串) */
+  itemsJson?: string
+  /** 分析板快照(JSON数组字符串) */
+  boardsJson?: string
+  remark?: string
+  createBy?: string
+  createTime?: string
+}
+
+/** 分析板（仪表板内嵌套子业务模块） */
+export interface VisualBoard {
+  id?: string
+  dashboardId?: string
+  boardName?: string
+  subtitle?: string
+  icon?: string
+  /** ANALYSIS / CUSTOM */
+  boardType?: string
+  /** 板块样式与布局配置(JSON) */
+  layout?: string
+  /** 分析板独立筛选配置(JSON) */
+  filters?: string
+  /** 是否联动全局筛选 1:联动 0:独立 */
+  linkGlobal?: number
+  /** 自动刷新周期(秒) */
+  refreshInterval?: number
+  /** 0:展开 1:折叠 */
+  collapse?: number
+  /** 布局锁定 */
+  locked?: number
+  sortOrder?: number
+  status?: number
+  createTime?: string
+  updateTime?: string
 }
 
 export interface AdhocQueryRequest {

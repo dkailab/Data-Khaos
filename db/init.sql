@@ -1,6 +1,6 @@
 -- ============================================================
 -- Data Khaos 达梦数据库初始化脚本
--- 作者: pmdream
+-- 作者: dkailab
 -- 数据库: 达梦 DM8
 -- ============================================================
 
@@ -114,7 +114,18 @@ CREATE TABLE sys_user_org (
 
 COMMENT ON TABLE sys_user_org IS '用户组织关联表';
 
--- 1.8 行权限策略表
+-- 1.8 组织权限关联表（部门-菜单权限）
+CREATE TABLE sys_org_permission (
+    id              VARCHAR(32) PRIMARY KEY,
+    org_id          VARCHAR(32) NOT NULL,       -- 组织ID
+    permission_id   VARCHAR(32) NOT NULL,       -- 菜单/资源ID
+    permission_type VARCHAR(50) DEFAULT 'MENU', -- MENU/API/DATA
+    UNIQUE(org_id, permission_id, permission_type)
+);
+
+COMMENT ON TABLE sys_org_permission IS '组织部门权限关联表（部门授予的菜单权限，成员自动继承）';
+
+-- 1.9 行权限策略表
 CREATE TABLE sys_row_policy (
     id              VARCHAR(32) PRIMARY KEY,
     policy_name     VARCHAR(200) NOT NULL,
@@ -515,6 +526,7 @@ COMMENT ON TABLE visual_dashboard IS '仪表板表';
 CREATE TABLE visual_dashboard_item (
     id            VARCHAR(32) PRIMARY KEY,
     dashboard_id  VARCHAR(32) NOT NULL,
+    board_id      VARCHAR(32),                  -- 所属分析板ID
     title         VARCHAR(200),
     chart_type    VARCHAR(50) DEFAULT 'TABLE',  -- BAR / LINE / PIE / TABLE / NUMBER
     datasource_id VARCHAR(32),
@@ -529,6 +541,29 @@ CREATE TABLE visual_dashboard_item (
 );
 
 COMMENT ON TABLE visual_dashboard_item IS '仪表板组件表';
+
+-- 8.3 分析板表（仪表板内嵌套子业务模块）
+CREATE TABLE visual_board (
+    id               VARCHAR(32) PRIMARY KEY,
+    dashboard_id     VARCHAR(32) NOT NULL,
+    board_name       VARCHAR(200) NOT NULL,
+    subtitle         VARCHAR(500),
+    icon             VARCHAR(100),
+    board_type       VARCHAR(50) DEFAULT 'ANALYSIS', -- ANALYSIS / CUSTOM
+    layout           TEXT,                          -- 板块样式与布局（JSON）
+    refresh_interval INT DEFAULT 60,
+    collapse         TINYINT DEFAULT 0,             -- 0:展开 1:折叠
+    locked           TINYINT DEFAULT 0,             -- 布局锁定
+    sort_order       INT DEFAULT 0,
+    status           TINYINT DEFAULT 1,
+    create_time      DATETIME DEFAULT CURRENT_TIMESTAMP(),
+    update_time      DATETIME DEFAULT CURRENT_TIMESTAMP()
+);
+
+COMMENT ON TABLE visual_board IS '分析板表（仪表板内嵌套子业务模块）';
+CREATE INDEX idx_board_dashboard ON visual_board(dashboard_id);
+
+ALTER TABLE visual_dashboard_version ADD COLUMN boards_json LONGTEXT COMMENT '分析板快照(JSON数组)';
 
 -- ============================================================
 -- 9. 初始数据

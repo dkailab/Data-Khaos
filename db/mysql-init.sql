@@ -86,6 +86,14 @@ CREATE TABLE IF NOT EXISTS sys_user_org (
     UNIQUE KEY uk_user_org (user_id, org_id)
 ) ENGINE=InnoDB COMMENT='用户组织关联表';
 
+CREATE TABLE IF NOT EXISTS sys_org_permission (
+    id              VARCHAR(32) NOT NULL PRIMARY KEY COMMENT '主键ID',
+    org_id          VARCHAR(32) NOT NULL COMMENT '组织ID',
+    permission_id   VARCHAR(32) NOT NULL COMMENT '菜单/资源ID',
+    permission_type VARCHAR(50) DEFAULT 'MENU' COMMENT '类型 MENU/API/DATA',
+    UNIQUE KEY uk_org_perm (org_id, permission_id, permission_type)
+) ENGINE=InnoDB COMMENT='组织部门权限关联表（部门授予的菜单权限，成员自动继承）';
+
 CREATE TABLE IF NOT EXISTS sys_row_policy (
     id              VARCHAR(32)  NOT NULL PRIMARY KEY COMMENT '主键ID',
     policy_name     VARCHAR(200) NOT NULL COMMENT '策略名称',
@@ -408,19 +416,37 @@ CREATE TABLE IF NOT EXISTS visual_dashboard (
     description      VARCHAR(500) COMMENT '描述',
     layout           TEXT COMMENT '布局配置(JSON)',
     refresh_interval INT DEFAULT 60 COMMENT '刷新间隔(秒)',
-    status           TINYINT DEFAULT 1 COMMENT '状态',
+    status           TINYINT DEFAULT 1 COMMENT '状态 0:停用 1:草稿 2:已上线',
+    version          INT DEFAULT 0 COMMENT '当前版本号',
     create_by        VARCHAR(32) COMMENT '创建人',
     create_time      DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     update_time      DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '更新时间'
 ) ENGINE=InnoDB COMMENT='仪表板表';
 
+CREATE TABLE IF NOT EXISTS visual_dashboard_version (
+    id               VARCHAR(32) NOT NULL PRIMARY KEY COMMENT '主键ID',
+    dashboard_id     VARCHAR(32) NOT NULL COMMENT '仪表板ID',
+    version          INT DEFAULT 1 COMMENT '版本号',
+    name             VARCHAR(200) COMMENT '仪表板名称快照',
+    description      VARCHAR(500) COMMENT '描述快照',
+    layout           TEXT COMMENT '布局快照(JSON)',
+    refresh_interval INT DEFAULT 60 COMMENT '刷新间隔快照',
+    items_json       LONGTEXT COMMENT '组件快照(JSON数组)',
+    remark           VARCHAR(500) COMMENT '发布说明',
+    create_by        VARCHAR(32) COMMENT '发布人',
+    create_time      DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '发布时间'
+) ENGINE=InnoDB COMMENT='仪表板版本快照表';
+CREATE INDEX idx_dv_dashboard ON visual_dashboard_version(dashboard_id);
+
 CREATE TABLE IF NOT EXISTS visual_dashboard_item (
     id            VARCHAR(32) NOT NULL PRIMARY KEY COMMENT '主键ID',
     dashboard_id  VARCHAR(32) NOT NULL COMMENT '仪表板ID',
+    board_id      VARCHAR(32) COMMENT '分析板ID',
     title         VARCHAR(200) COMMENT '组件标题',
-    chart_type    VARCHAR(50) DEFAULT 'TABLE' COMMENT '图表类型 BAR/LINE/PIE/TABLE/NUMBER',
+    chart_type    VARCHAR(50) DEFAULT 'TABLE' COMMENT '图表类型 BAR/LINE/PIE/SCATTER/HEATMAP/AREA/GAUGE/TREEMAP/BOXPLOT/MAP/TABLE/NUMBER',
     datasource_id VARCHAR(32) COMMENT '数据源ID',
     query_sql     TEXT COMMENT '查询SQL',
+    drill_sql     TEXT COMMENT '下钻明细SQL(可选)',
     config        TEXT COMMENT '组件配置(JSON)',
     pos_x         INT DEFAULT 0 COMMENT 'X坐标',
     pos_y         INT DEFAULT 0 COMMENT 'Y坐标',
@@ -429,6 +455,28 @@ CREATE TABLE IF NOT EXISTS visual_dashboard_item (
     create_time   DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     update_time   DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '更新时间'
 ) ENGINE=InnoDB COMMENT='仪表板组件表';
+
+CREATE TABLE IF NOT EXISTS visual_board (
+    id               VARCHAR(32) NOT NULL PRIMARY KEY COMMENT '主键ID',
+    dashboard_id     VARCHAR(32) NOT NULL COMMENT '仪表板ID',
+    board_name       VARCHAR(200) NOT NULL COMMENT '分析板标题',
+    subtitle         VARCHAR(500) COMMENT '副标题',
+    icon             VARCHAR(100) COMMENT '图标',
+    board_type       VARCHAR(50) DEFAULT 'ANALYSIS' COMMENT '类型 ANALYSIS/CUSTOM',
+    layout           TEXT COMMENT '板块样式与布局配置(JSON)',
+    filters          TEXT COMMENT '分析板独立筛选配置(JSON)',
+    link_global      TINYINT DEFAULT 1 COMMENT '是否联动全局筛选 1:联动 0:独立',
+    refresh_interval INT DEFAULT 60 COMMENT '自动刷新周期(秒)',
+    collapse         TINYINT DEFAULT 0 COMMENT '是否折叠 0:展开 1:折叠',
+    locked           TINYINT DEFAULT 0 COMMENT '是否锁定布局',
+    sort_order       INT DEFAULT 0 COMMENT '排序',
+    status           TINYINT DEFAULT 1 COMMENT '状态',
+    create_time      DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    update_time      DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '更新时间'
+) ENGINE=InnoDB COMMENT='分析板表（仪表板内嵌套子业务模块）';
+CREATE INDEX idx_board_dashboard ON visual_board(dashboard_id);
+
+ALTER TABLE visual_dashboard_version ADD COLUMN boards_json LONGTEXT COMMENT '分析板快照(JSON数组)' AFTER items_json;
 
 -- ============================================================
 -- 9. 初始数据
@@ -491,7 +539,7 @@ INSERT INTO notify_template (id, template_code, template_name, channel, title_te
 ('2', 'TASK_FAIL', '任务失败告警', 'SITE', '【任务告警】${jobName} 执行失败', '任务 ${jobName} 于 ${time} 执行失败：${message}');
 
 -- 默认示例仪表板
-INSERT INTO visual_dashboard (id, name, description, refresh_interval, status, create_by) VALUES
-('1', '平台总览', '平台运行指标总览', 60, 1, '1');
+INSERT INTO visual_dashboard (id, name, description, refresh_interval, status, version, create_by) VALUES
+('1', '平台总览', '平台运行指标总览', 60, 1, 0, '1');
 
 SET FOREIGN_KEY_CHECKS = 1;

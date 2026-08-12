@@ -1,6 +1,6 @@
 # Data Khaos (数据混沌) — 大数据基建整体规划
 
-> **作者**: pmdream
+> **作者**: dkailab
 > **开源协议**: Apache License 2.0
 > **项目定位**: 国产化大数据基础设施全栈平台
 
@@ -657,4 +657,4 @@ data-khaos/
 
 ---
 
-*本文档由 pmdream 创建，Data Khaos 项目 © 2026 pmdream。Licensed under Apache 2.0.*
+*本文档由 dkailab 创建，Data Khaos 项目 © 2026 dkailab。Licensed under Apache 2.0.*

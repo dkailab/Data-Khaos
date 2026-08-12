@@ -17,16 +17,22 @@
       <el-table-column prop="name" label="仪表板名称" min-width="160" />
       <el-table-column prop="description" label="描述" min-width="220" show-overflow-tooltip />
       <el-table-column prop="refreshInterval" label="刷新间隔(秒)" width="120" />
+      <el-table-column prop="version" label="版本" width="70" />
       <el-table-column label="状态" width="90">
         <template #default="{ row }">
-          <el-tag :type="row.status === 1 ? 'success' : 'info'">{{ row.status === 1 ? '启用' : '停用' }}</el-tag>
+          <el-tag v-if="row.status === 2" type="success">已上线</el-tag>
+          <el-tag v-else-if="row.status === 1" type="warning">草稿</el-tag>
+          <el-tag v-else type="info">停用</el-tag>
         </template>
       </el-table-column>
       <el-table-column prop="createBy" label="创建人" min-width="110" />
       <el-table-column prop="updateTime" label="更新时间" width="170" />
-      <el-table-column label="操作" width="150" fixed="right">
+      <el-table-column label="操作" width="260" fixed="right">
         <template #default="{ row }">
-          <el-button link type="primary" @click="openEdit(row)">编辑</el-button>
+          <el-button link type="primary" @click="openEditor(row)">查看/编辑</el-button>
+          <el-button v-if="row.status !== 2" link type="success" @click="handlePublish(row)">上线</el-button>
+          <el-button v-else link type="warning" @click="handleUnpublish(row)">下线</el-button>
+          <el-button link @click="openVersions(row)">版本</el-button>
           <el-button link type="danger" @click="handleDelete(row)">删除</el-button>
         </template>
       </el-table-column>
@@ -65,17 +71,28 @@
         <el-button type="primary" :loading="submitting" @click="submit">保存</el-button>
       </template>
     </el-dialog>
+
+    <el-dialog v-model="versionDialog" title="版本历史" width="640px" destroy-on-close>
+      <el-table :data="versions" border size="small">
+        <el-table-column prop="version" label="版本" width="70" />
+        <el-table-column prop="remark" label="发布说明" min-width="160" />
+        <el-table-column prop="createBy" label="发布人" width="110" />
+        <el-table-column prop="createTime" label="发布时间" width="170" />
+      </el-table>
+    </el-dialog>
   </el-card>
 </template>
 
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 import { Plus, Refresh, Search } from '@element-plus/icons-vue'
-import { createDashboard, deleteDashboard, pageDashboards, updateDashboard } from '@/api/visual'
-import type { VisualDashboard } from '@/types'
+import { createDashboard, dashboardVersions, deleteDashboard, pageDashboards, publishDashboard, unpublishDashboard, updateDashboard } from '@/api/visual'
+import type { VisualDashboard, VisualDashboardVersion } from '@/types'
 
+const router = useRouter()
 const loading = ref(false)
 const submitting = ref(false)
 const list = ref<VisualDashboard[]>([])
@@ -141,10 +158,44 @@ async function submit() {
 }
 
 async function handleDelete(row: VisualDashboard) {
-  await ElMessageBox.confirm(`确认删除仪表板「${row.name}」吗？将级联删除其组件。`, '提示', { type: 'warning' })
+  await ElMessageBox.confirm(`确认删除仪表板「${row.name}」吗？将级联删除其组件与版本。`, '提示', { type: 'warning' })
   await deleteDashboard(row.id!)
   ElMessage.success('删除成功')
   load()
+}
+
+function openEditor(row: VisualDashboard) {
+  router.push({ name: 'VisualDashboardEdit', params: { id: row.id } })
+}
+
+async function handlePublish(row: VisualDashboard) {
+  const { value } = await ElMessageBox.prompt('请输入发布说明（可选）', '上线仪表板', {
+    confirmButtonText: '确认上线',
+    cancelButtonText: '取消',
+    inputType: 'textarea',
+  }).catch(() => ({ value: '' }))
+  submitting.value = true
+  try {
+    const v = await publishDashboard(row.id!, value || undefined)
+    ElMessage.success(`已上线，版本号 v${v}`)
+    load()
+  } finally {
+    submitting.value = false
+  }
+}
+
+async function handleUnpublish(row: VisualDashboard) {
+  await ElMessageBox.confirm(`确认下线仪表板「${row.name}」？`, '提示', { type: 'warning' })
+  await unpublishDashboard(row.id!)
+  ElMessage.success('已下线')
+  load()
+}
+
+const versionDialog = ref(false)
+const versions = ref<VisualDashboardVersion[]>([])
+async function openVersions(row: VisualDashboard) {
+  versions.value = await dashboardVersions(row.id!)
+  versionDialog.value = true
 }
 
 onMounted(load)

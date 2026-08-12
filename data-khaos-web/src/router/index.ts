@@ -137,6 +137,12 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/visual/dashboard/DashboardList.vue'),
         meta: { title: '仪表板管理' },
       },
+      {
+        path: 'visual/dashboard/edit/:id',
+        name: 'VisualDashboardEdit',
+        component: () => import('@/views/visual/dashboard/DashboardEditor.vue'),
+        meta: { title: 'DK实时分析板' },
+      },
       // 调度中心
       {
         path: 'schedule/job',

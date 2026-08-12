@@ -20,6 +20,9 @@ public class VisualDashboardItem extends BaseEntity {
     /** 仪表板ID */
     private String dashboardId;
 
+    /** 分析板ID */
+    private String boardId;
+
     /** 组件标题 */
     private String title;
 
@@ -31,6 +34,9 @@ public class VisualDashboardItem extends BaseEntity {
 
     /** 查询SQL */
     private String querySql;
+
+    /** 下钻明细SQL（可选，配置后点击图表用该SQL下钻） */
+    private String drillSql;
 
     /** 组件配置（JSON） */
     private String config;

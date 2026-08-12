@@ -2,7 +2,7 @@
 
 > 国产化大数据基础设施全栈平台
 >
-> **作者**: pmdream | **开源协议**: Apache License 2.0
+> **作者**: dkailab | **开源协议**: Apache License 2.0
 
 ---
 
@@ -101,4 +101,4 @@ Data Khaos 基于 [Apache License 2.0](LICENSE) 开源协议。
 
 ---
 
-*Copyright [2026] [pmdream]*
+*Copyright [2026] [dkailab]*

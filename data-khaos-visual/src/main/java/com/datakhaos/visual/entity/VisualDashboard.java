@@ -29,7 +29,11 @@ public class VisualDashboard extends BaseEntity {
     /** 刷新间隔（秒） */
     private Integer refreshInterval;
 
+    /** 状态 0:停用 1:草稿 2:已上线 */
     private Integer status;
+
+    /** 当前版本号 */
+    private Integer version;
 
     /** 创建人 */
     private String createBy;

@@ -33,6 +33,8 @@ public class PermissionService {
     private final SysRoleMapper roleMapper;
     private final SysRolePermissionMapper rolePermissionMapper;
     private final SysMenuMapper menuMapper;
+    private final com.datakhaos.permission.mapper.SysUserOrgMapper userOrgMapper;
+    private final com.datakhaos.permission.mapper.SysOrgPermissionMapper orgPermissionMapper;
 
     /**
      * 计算用户权限视图（角色 / 权限标识 / 可见菜单）
@@ -51,12 +53,53 @@ public class PermissionService {
         boolean superAdmin = roleCodes.contains(SUPER_ADMIN) || DEFAULT_ADMIN_ID.equals(userId);
 
         List<SysMenu> menus = superAdmin ? allMenus()
-                : menusByRoleIds(roleIds);
+                : mergeRoleAndOrgMenus(roleIds, userId);
 
         dto.setMenus(menus.stream().map(this::toDto).toList());
         dto.setPermissions(menus.stream().map(SysMenu::getPermission)
                 .filter(StrUtil::isNotBlank).distinct().toList());
         return dto;
+    }
+
+    /** 合并角色菜单与所属部门继承的菜单权限 */
+    private List<SysMenu> mergeRoleAndOrgMenus(List<String> roleIds, String userId) {
+        List<String> menuIds = roleIds.isEmpty() ? List.of() : roleMenuIds(roleIds);
+        // 用户所属部门授予的菜单权限（成员自动继承）
+        List<String> orgIds = userOrgMapper.selectList(
+                        new LambdaQueryWrapper<com.datakhaos.permission.entity.SysUserOrg>()
+                                .eq(com.datakhaos.permission.entity.SysUserOrg::getUserId, userId))
+                .stream().map(com.datakhaos.permission.entity.SysUserOrg::getOrgId).toList();
+        if (!orgIds.isEmpty()) {
+            List<String> orgMenuIds = orgPermissionMapper.selectList(
+                            new LambdaQueryWrapper<com.datakhaos.permission.entity.SysOrgPermission>()
+                                    .in(com.datakhaos.permission.entity.SysOrgPermission::getOrgId, orgIds)
+                                    .eq(com.datakhaos.permission.entity.SysOrgPermission::getPermissionType, "MENU"))
+                    .stream().map(com.datakhaos.permission.entity.SysOrgPermission::getPermissionId).distinct().toList();
+            menuIds = new java.util.ArrayList<>(menuIds);
+            for (String id : orgMenuIds) {
+                if (!menuIds.contains(id)) {
+                    menuIds.add(id);
+                }
+            }
+        }
+        if (menuIds.isEmpty()) {
+            return List.of();
+        }
+        return menuMapper.selectBatchIds(menuIds).stream()
+                .filter(m -> m.getStatus() != null && m.getStatus() == 1)
+                .sorted((a, b) -> {
+                    int sa = a.getSortOrder() == null ? 0 : a.getSortOrder();
+                    int sb = b.getSortOrder() == null ? 0 : b.getSortOrder();
+                    return Integer.compare(sa, sb);
+                }).toList();
+    }
+
+    private List<String> roleMenuIds(List<String> roleIds) {
+        return rolePermissionMapper.selectList(
+                        new LambdaQueryWrapper<SysRolePermission>()
+                                .in(SysRolePermission::getRoleId, roleIds)
+                                .eq(SysRolePermission::getPermissionType, "MENU"))
+                .stream().map(SysRolePermission::getPermissionId).distinct().toList();
     }
 
     /** 查询用户权限标识集合 */
@@ -97,27 +140,6 @@ public class PermissionService {
         return menuMapper.selectList(new LambdaQueryWrapper<SysMenu>()
                 .eq(SysMenu::getStatus, 1)
                 .orderByAsc(SysMenu::getSortOrder));
-    }
-
-    private List<SysMenu> menusByRoleIds(List<String> roleIds) {
-        if (roleIds.isEmpty()) {
-            return List.of();
-        }
-        List<String> permissionIds = rolePermissionMapper.selectList(
-                        new LambdaQueryWrapper<SysRolePermission>()
-                                .in(SysRolePermission::getRoleId, roleIds)
-                                .eq(SysRolePermission::getPermissionType, "MENU"))
-                .stream().map(SysRolePermission::getPermissionId).distinct().toList();
-        if (permissionIds.isEmpty()) {
-            return List.of();
-        }
-        return menuMapper.selectBatchIds(permissionIds).stream()
-                .filter(m -> m.getStatus() != null && m.getStatus() == 1)
-                .sorted((a, b) -> {
-                    int sa = a.getSortOrder() == null ? 0 : a.getSortOrder();
-                    int sb = b.getSortOrder() == null ? 0 : b.getSortOrder();
-                    return Integer.compare(sa, sb);
-                }).toList();
     }
 
     private MenuDto toDto(SysMenu menu) {
