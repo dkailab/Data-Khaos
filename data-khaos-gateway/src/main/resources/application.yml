@@ -1,0 +1,78 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: data-khaos-gateway
+  data:
+    redis:
+      host: ${REDIS_HOST:127.0.0.1}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+  cloud:
+    nacos:
+      discovery:
+        server-addr: ${NACOS_ADDR:127.0.0.1:8848}
+    gateway:
+      routes:
+        - id: data-khaos-auth
+          uri: lb://data-khaos-auth
+          predicates:
+            - Path=/api/auth/**
+        - id: data-khaos-permission
+          uri: lb://data-khaos-permission
+          predicates:
+            - Path=/api/permission/**
+        - id: data-khaos-approval
+          uri: lb://data-khaos-approval
+          predicates:
+            - Path=/api/approval/**
+        - id: data-khaos-datasource
+          uri: lb://data-khaos-datasource
+          predicates:
+            - Path=/api/ds/**
+        - id: data-khaos-metadata
+          uri: lb://data-khaos-metadata
+          predicates:
+            - Path=/api/meta/**
+        - id: data-khaos-mart
+          uri: lb://data-khaos-mart
+          predicates:
+            - Path=/api/mart/**
+        - id: data-khaos-query
+          uri: lb://data-khaos-query
+          predicates:
+            - Path=/api/query/**
+          filters:
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: 10
+                redis-rate-limiter.burstCapacity: 20
+                key-resolver: "#{@userKeyResolver}"
+        - id: data-khaos-visual
+          uri: lb://data-khaos-visual
+          predicates:
+            - Path=/api/visual/**
+        - id: data-khaos-schedule
+          uri: lb://data-khaos-schedule
+          predicates:
+            - Path=/api/schedule/**
+        - id: data-khaos-notification
+          uri: lb://data-khaos-notification
+          predicates:
+            - Path=/api/notify/**
+      globalcors:
+        cors-configurations:
+          '[/**]':
+            allowedOriginPatterns: "*"
+            allowedMethods: "*"
+            allowedHeaders: "*"
+            allowCredentials: true
+
+data-khaos:
+  jwt:
+    secret: ${JWT_SECRET:data-khaos-jwt-secret-key-2026-hs256-0123456789}
+
+logging:
+  level:
+    com.datakhaos.gateway: debug

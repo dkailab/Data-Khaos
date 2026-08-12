@@ -1,0 +1,497 @@
+-- ============================================================
+-- Data Khaos MySQL 初始化脚本（开发环境）
+-- 数据库: MySQL 8.x (utf8mb4)
+-- 生产方式请使用 db/dm8-init.sql（达梦 DM8）
+-- ============================================================
+
+CREATE DATABASE IF NOT EXISTS data_khaos DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
+USE data_khaos;
+
+SET NAMES utf8mb4;
+SET FOREIGN_KEY_CHECKS = 0;
+
+-- ============================================================
+-- 1. 系统表 - 认证与权限
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS sys_user (
+    id          VARCHAR(32)  NOT NULL PRIMARY KEY COMMENT '主键ID',
+    username    VARCHAR(100) NOT NULL COMMENT '用户名',
+    password    VARCHAR(255) NOT NULL COMMENT '密码(BCrypt加密)',
+    real_name   VARCHAR(100) COMMENT '真实姓名',
+    email       VARCHAR(200) COMMENT '邮箱',
+    phone       VARCHAR(20)  COMMENT '手机号',
+    avatar      VARCHAR(500) COMMENT '头像',
+    status      TINYINT DEFAULT 1 COMMENT '状态 1:启用 0:禁用',
+    create_time DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    update_time DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '更新时间',
+    UNIQUE KEY uk_username (username)
+) ENGINE=InnoDB COMMENT='用户表';
+
+CREATE TABLE IF NOT EXISTS sys_role (
+    id          VARCHAR(32)  NOT NULL PRIMARY KEY COMMENT '主键ID',
+    role_code   VARCHAR(100) NOT NULL COMMENT '角色编码',
+    role_name   VARCHAR(200) NOT NULL COMMENT '角色名称',
+    description VARCHAR(500) COMMENT '描述',
+    status      TINYINT DEFAULT 1 COMMENT '状态',
+    create_time DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    UNIQUE KEY uk_role_code (role_code)
+) ENGINE=InnoDB COMMENT='角色表';
+
+CREATE TABLE IF NOT EXISTS sys_user_role (
+    id      VARCHAR(32) NOT NULL PRIMARY KEY COMMENT '主键ID',
+    user_id VARCHAR(32) NOT NULL COMMENT '用户ID',
+    role_id VARCHAR(32) NOT NULL COMMENT '角色ID',
+    UNIQUE KEY uk_user_role (user_id, role_id)
+) ENGINE=InnoDB COMMENT='用户角色关联表';
+
+CREATE TABLE IF NOT EXISTS sys_menu (
+    id          VARCHAR(32)  NOT NULL PRIMARY KEY COMMENT '主键ID',
+    parent_id   VARCHAR(32) COMMENT '父菜单ID',
+    name        VARCHAR(200) NOT NULL COMMENT '菜单名称',
+    path        VARCHAR(500) COMMENT '路由路径',
+    component   VARCHAR(500) COMMENT '前端组件',
+    permission  VARCHAR(200) COMMENT '权限标识(如 sys:user:list)',
+    icon        VARCHAR(100) COMMENT '图标',
+    type        TINYINT DEFAULT 1 COMMENT '类型 0:目录 1:菜单 2:按钮 3:API',
+    sort_order  INT DEFAULT 0 COMMENT '排序',
+    status      TINYINT DEFAULT 1 COMMENT '状态',
+    create_time DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间'
+) ENGINE=InnoDB COMMENT='菜单/资源表';
+
+CREATE TABLE IF NOT EXISTS sys_role_permission (
+    id              VARCHAR(32) NOT NULL PRIMARY KEY COMMENT '主键ID',
+    role_id         VARCHAR(32) NOT NULL COMMENT '角色ID',
+    permission_id   VARCHAR(32) NOT NULL COMMENT '权限(资源)ID',
+    permission_type VARCHAR(50) DEFAULT 'MENU' COMMENT '类型 MENU/API/DATA',
+    UNIQUE KEY uk_role_perm (role_id, permission_id, permission_type)
+) ENGINE=InnoDB COMMENT='角色权限关联表';
+
+CREATE TABLE IF NOT EXISTS sys_organization (
+    id          VARCHAR(32)  NOT NULL PRIMARY KEY COMMENT '主键ID',
+    parent_id   VARCHAR(32) COMMENT '父组织ID',
+    org_name    VARCHAR(200) NOT NULL COMMENT '组织名称',
+    org_code    VARCHAR(100) COMMENT '组织编码',
+    org_type    VARCHAR(50) COMMENT '类型 DEPT/COMPANY/GROUP',
+    sort_order  INT DEFAULT 0 COMMENT '排序',
+    status      TINYINT DEFAULT 1 COMMENT '状态',
+    create_time DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间'
+) ENGINE=InnoDB COMMENT='组织架构表';
+
+CREATE TABLE IF NOT EXISTS sys_user_org (
+    id         VARCHAR(32) NOT NULL PRIMARY KEY COMMENT '主键ID',
+    user_id    VARCHAR(32) NOT NULL COMMENT '用户ID',
+    org_id     VARCHAR(32) NOT NULL COMMENT '组织ID',
+    is_primary TINYINT DEFAULT 0 COMMENT '是否主组织',
+    UNIQUE KEY uk_user_org (user_id, org_id)
+) ENGINE=InnoDB COMMENT='用户组织关联表';
+
+CREATE TABLE IF NOT EXISTS sys_row_policy (
+    id              VARCHAR(32)  NOT NULL PRIMARY KEY COMMENT '主键ID',
+    policy_name     VARCHAR(200) NOT NULL COMMENT '策略名称',
+    target_table    VARCHAR(200) NOT NULL COMMENT '目标表',
+    expression      VARCHAR(1000) NOT NULL COMMENT '过滤表达式(支持 #{currentUserId}/#{currentOrgId})',
+    expression_desc VARCHAR(500) COMMENT '表达式描述',
+    role_id         VARCHAR(32) COMMENT '角色ID',
+    user_id         VARCHAR(32) COMMENT '用户ID',
+    status          TINYINT DEFAULT 1 COMMENT '状态',
+    create_time     DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间'
+) ENGINE=InnoDB COMMENT='行权限策略表';
+
+CREATE TABLE IF NOT EXISTS sys_column_policy (
+    id            VARCHAR(32)  NOT NULL PRIMARY KEY COMMENT '主键ID',
+    policy_name   VARCHAR(200) NOT NULL COMMENT '策略名称',
+    target_table  VARCHAR(200) NOT NULL COMMENT '目标表',
+    column_name   VARCHAR(200) NOT NULL COMMENT '目标字段',
+    mask_type     VARCHAR(50) DEFAULT 'MASK' COMMENT '脱敏方式 MASK/ENCRYPT/HIDE/PLAIN',
+    mask_rule     VARCHAR(200) COMMENT '脱敏规则(如 left:3,right:4)',
+    role_id       VARCHAR(32) COMMENT '角色ID',
+    user_id       VARCHAR(32) COMMENT '用户ID',
+    status        TINYINT DEFAULT 1 COMMENT '状态',
+    create_time   DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间'
+) ENGINE=InnoDB COMMENT='列权限策略表';
+
+CREATE TABLE IF NOT EXISTS sys_table_permission (
+    id              VARCHAR(32) NOT NULL PRIMARY KEY COMMENT '主键ID',
+    datasource_id   VARCHAR(32) COMMENT '数据源ID',
+    database_name   VARCHAR(200) COMMENT '数据库',
+    table_name      VARCHAR(200) COMMENT '表名',
+    permission_type VARCHAR(50) NOT NULL COMMENT '权限类型 SELECT/INSERT/UPDATE/DELETE/ALL',
+    role_id         VARCHAR(32) COMMENT '角色ID',
+    user_id         VARCHAR(32) COMMENT '用户ID',
+    grant_type      VARCHAR(50) DEFAULT 'ROLE' COMMENT '授予类型 ROLE/USER',
+    status          TINYINT DEFAULT 1 COMMENT '状态',
+    create_time     DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间'
+) ENGINE=InnoDB COMMENT='表权限表';
+
+-- ============================================================
+-- 2. 业务表 - 审批流程
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS app_apply (
+    id               VARCHAR(32) NOT NULL PRIMARY KEY COMMENT '主键ID',
+    applicant_id     VARCHAR(32) NOT NULL COMMENT '申请人ID',
+    apply_type       VARCHAR(50) NOT NULL COMMENT '类型 TABLE/REPORT/DATASOURCE/MENU',
+    target_id        VARCHAR(32) COMMENT '申请目标ID',
+    target_name      VARCHAR(200) COMMENT '申请目标名称',
+    reason           VARCHAR(1000) COMMENT '申请理由',
+    status           TINYINT DEFAULT 0 COMMENT '状态 0:待审批 1:通过 2:驳回 3:已撤销',
+    current_approver VARCHAR(32) COMMENT '当前审批人',
+    create_time      DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    update_time      DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '更新时间'
+) ENGINE=InnoDB COMMENT='权限申请表';
+
+CREATE TABLE IF NOT EXISTS app_approval_record (
+    id          VARCHAR(32) NOT NULL PRIMARY KEY COMMENT '主键ID',
+    apply_id    VARCHAR(32) NOT NULL COMMENT '申请单ID',
+    approver_id VARCHAR(32) NOT NULL COMMENT '审批人ID',
+    action      TINYINT NOT NULL COMMENT '动作 1:通过 2:驳回 3:转交',
+    comment     VARCHAR(1000) COMMENT '审批意见',
+    create_time DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间'
+) ENGINE=InnoDB COMMENT='审批记录表';
+
+CREATE TABLE IF NOT EXISTS app_approval_flow (
+    id            VARCHAR(32) NOT NULL PRIMARY KEY COMMENT '主键ID',
+    flow_name     VARCHAR(200) NOT NULL COMMENT '流程名称',
+    apply_type    VARCHAR(50) NOT NULL COMMENT '申请类型',
+    step_order    INT DEFAULT 1 COMMENT '步骤序号',
+    approver_role VARCHAR(100) COMMENT '审批角色编码',
+    create_time   DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间'
+) ENGINE=InnoDB COMMENT='审批流程定义表';
+
+-- ============================================================
+-- 3. 元数据表
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS meta_datasource (
+    id            VARCHAR(32) NOT NULL PRIMARY KEY COMMENT '主键ID',
+    ds_name       VARCHAR(200) NOT NULL COMMENT '数据源名称',
+    ds_type       VARCHAR(50) NOT NULL COMMENT '类型 HIVE/DORIS/TRANSWARP/CLICKHOUSE/MYSQL/DM8/POSTGRESQL',
+    host          VARCHAR(200) COMMENT '主机',
+    port          INT COMMENT '端口',
+    database_name VARCHAR(200) COMMENT '默认库',
+    username      VARCHAR(200) COMMENT '用户名',
+    password      VARCHAR(500) COMMENT '密码(AES加密存储)',
+    properties    TEXT COMMENT '扩展属性(JSON)',
+    status        TINYINT DEFAULT 1 COMMENT '状态',
+    create_time   DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    update_time   DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '更新时间'
+) ENGINE=InnoDB COMMENT='数据源配置表';
+
+CREATE TABLE IF NOT EXISTS meta_database (
+    id            VARCHAR(32) NOT NULL PRIMARY KEY COMMENT '主键ID',
+    datasource_id VARCHAR(32) NOT NULL COMMENT '数据源ID',
+    database_name VARCHAR(200) NOT NULL COMMENT '数据库名',
+    description   VARCHAR(500) COMMENT '描述',
+    sync_time     DATETIME COMMENT '同步时间',
+    create_time   DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    UNIQUE KEY uk_ds_db (datasource_id, database_name)
+) ENGINE=InnoDB COMMENT='数据库信息表';
+
+CREATE TABLE IF NOT EXISTS meta_table (
+    id          VARCHAR(32) NOT NULL PRIMARY KEY COMMENT '主键ID',
+    database_id VARCHAR(32) NOT NULL COMMENT '数据库ID',
+    table_name  VARCHAR(200) NOT NULL COMMENT '表名',
+    table_type  VARCHAR(50) DEFAULT 'TABLE' COMMENT '类型 TABLE/VIEW',
+    description VARCHAR(500) COMMENT '描述',
+    row_count   BIGINT DEFAULT 0 COMMENT '行数',
+    table_size  BIGINT DEFAULT 0 COMMENT '大小(字节)',
+    sync_time   DATETIME COMMENT '同步时间',
+    create_time DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    update_time DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '更新时间',
+    UNIQUE KEY uk_db_table (database_id, table_name)
+) ENGINE=InnoDB COMMENT='表信息表';
+
+CREATE TABLE IF NOT EXISTS meta_column (
+    id              VARCHAR(32) NOT NULL PRIMARY KEY COMMENT '主键ID',
+    table_id        VARCHAR(32) NOT NULL COMMENT '表ID',
+    column_name     VARCHAR(200) NOT NULL COMMENT '字段名',
+    column_type     VARCHAR(100) COMMENT '字段类型',
+    column_length   INT COMMENT '长度',
+    column_scale    INT COMMENT '精度',
+    is_nullable     TINYINT DEFAULT 1 COMMENT '是否可空',
+    is_primary_key  TINYINT DEFAULT 0 COMMENT '是否主键',
+    default_value   VARCHAR(500) COMMENT '默认值',
+    description     VARCHAR(500) COMMENT '描述',
+    sort_order      INT DEFAULT 0 COMMENT '排序',
+    sensitive_level TINYINT DEFAULT 0 COMMENT '敏感级别 0:普通 1:敏感 2:高度敏感',
+    create_time     DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    UNIQUE KEY uk_table_col (table_id, column_name)
+) ENGINE=InnoDB COMMENT='字段信息表';
+
+CREATE TABLE IF NOT EXISTS meta_table_lineage (
+    id              VARCHAR(32) NOT NULL PRIMARY KEY COMMENT '主键ID',
+    source_table_id VARCHAR(32) NOT NULL COMMENT '源表ID',
+    target_table_id VARCHAR(32) NOT NULL COMMENT '目标表ID',
+    source_column   VARCHAR(200) COMMENT '源字段',
+    target_column   VARCHAR(200) COMMENT '目标字段',
+    relation_type   VARCHAR(50) DEFAULT 'ETL' COMMENT '关系类型',
+    create_time     DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间'
+) ENGINE=InnoDB COMMENT='表血缘关系表';
+
+-- ============================================================
+-- 4. 集市表
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS mart_model (
+    id            VARCHAR(32) NOT NULL PRIMARY KEY COMMENT '主键ID',
+    model_name    VARCHAR(200) NOT NULL COMMENT '模型名称',
+    model_code    VARCHAR(100) NOT NULL COMMENT '模型编码',
+    model_type    VARCHAR(50) DEFAULT 'STAR' COMMENT '类型 STAR/SNOWFLAKE',
+    datasource_id VARCHAR(32) COMMENT '数据源ID',
+    description   VARCHAR(500) COMMENT '描述',
+    status        TINYINT DEFAULT 0 COMMENT '状态 0:草稿 1:已发布 2:下线',
+    version       INT DEFAULT 1 COMMENT '版本',
+    create_time   DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    update_time   DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '更新时间',
+    UNIQUE KEY uk_model_code (model_code)
+) ENGINE=InnoDB COMMENT='模型定义表';
+
+CREATE TABLE IF NOT EXISTS mart_metric (
+    id          VARCHAR(32) NOT NULL PRIMARY KEY COMMENT '主键ID',
+    metric_name VARCHAR(200) NOT NULL COMMENT '指标名称',
+    metric_code VARCHAR(100) NOT NULL COMMENT '指标编码',
+    metric_type VARCHAR(50) DEFAULT 'ATOMIC' COMMENT '类型 ATOMIC/DERIVED',
+    expression  VARCHAR(1000) COMMENT '计算表达式',
+    data_type   VARCHAR(50) DEFAULT 'BIGINT' COMMENT '数据类型',
+    unit        VARCHAR(50) COMMENT '单位',
+    category_id VARCHAR(32) COMMENT '分类ID',
+    model_id    VARCHAR(32) COMMENT '模型ID',
+    description VARCHAR(500) COMMENT '描述',
+    status      TINYINT DEFAULT 1 COMMENT '状态',
+    create_time DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    update_time DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '更新时间',
+    UNIQUE KEY uk_metric_code (metric_code)
+) ENGINE=InnoDB COMMENT='指标定义表';
+
+CREATE TABLE IF NOT EXISTS mart_dimension (
+    id            VARCHAR(32) NOT NULL PRIMARY KEY COMMENT '主键ID',
+    dim_name      VARCHAR(200) NOT NULL COMMENT '维度名称',
+    dim_code      VARCHAR(100) NOT NULL COMMENT '维度编码',
+    dim_type      VARCHAR(50) DEFAULT 'COMMON' COMMENT '类型 COMMON/TIME/ORG',
+    model_id      VARCHAR(32) COMMENT '模型ID',
+    source_table  VARCHAR(200) COMMENT '来源表',
+    source_column VARCHAR(200) COMMENT '来源字段',
+    description   VARCHAR(500) COMMENT '描述',
+    status        TINYINT DEFAULT 1 COMMENT '状态',
+    create_time   DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    UNIQUE KEY uk_dim_code (dim_code)
+) ENGINE=InnoDB COMMENT='维度定义表';
+
+CREATE TABLE IF NOT EXISTS mart_dim_level (
+    id          VARCHAR(32) NOT NULL PRIMARY KEY COMMENT '主键ID',
+    dim_id      VARCHAR(32) NOT NULL COMMENT '维度ID',
+    level_name  VARCHAR(200) COMMENT '层级名称',
+    level_column VARCHAR(200) COMMENT '层级字段',
+    level_order INT DEFAULT 0 COMMENT '层级顺序',
+    create_time DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间'
+) ENGINE=InnoDB COMMENT='维度层级表';
+
+CREATE TABLE IF NOT EXISTS mart_model_rel (
+    id          VARCHAR(32) NOT NULL PRIMARY KEY COMMENT '主键ID',
+    model_id    VARCHAR(32) NOT NULL COMMENT '模型ID',
+    fact_table  VARCHAR(200) NOT NULL COMMENT '事实表',
+    dim_table   VARCHAR(200) NOT NULL COMMENT '维度表',
+    join_key    VARCHAR(200) NOT NULL COMMENT '关联键',
+    join_type   VARCHAR(50) DEFAULT 'INNER' COMMENT '关联类型 INNER/LEFT/RIGHT',
+    create_time DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间'
+) ENGINE=InnoDB COMMENT='模型关联关系表';
+
+-- ============================================================
+-- 5. 调度表
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS schedule_job (
+    id              VARCHAR(32) NOT NULL PRIMARY KEY COMMENT '主键ID',
+    job_name        VARCHAR(200) NOT NULL COMMENT '任务名称',
+    job_type        VARCHAR(50) NOT NULL COMMENT '类型 SYNC/SQL/REFRESH/PUSH',
+    job_group       VARCHAR(100) COMMENT '分组',
+    cron_expression VARCHAR(100) COMMENT 'Cron表达式',
+    datasource_id   VARCHAR(32) COMMENT '数据源ID',
+    target_sql      TEXT COMMENT '执行SQL',
+    target_table    VARCHAR(200) COMMENT '目标表',
+    params          TEXT COMMENT '参数(JSON)',
+    status          TINYINT DEFAULT 0 COMMENT '状态 0:停用 1:启用',
+    retry_count     INT DEFAULT 0 COMMENT '重试次数',
+    retry_interval  INT DEFAULT 60 COMMENT '重试间隔(秒)',
+    timeout         INT DEFAULT 3600 COMMENT '超时(秒)',
+    create_time     DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    update_time     DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '更新时间'
+) ENGINE=InnoDB COMMENT='任务定义表';
+
+CREATE TABLE IF NOT EXISTS schedule_job_log (
+    id            VARCHAR(32) NOT NULL PRIMARY KEY COMMENT '主键ID',
+    job_id        VARCHAR(32) NOT NULL COMMENT '任务ID',
+    status        TINYINT COMMENT '状态 0:运行中 1:成功 2:失败',
+    start_time    DATETIME COMMENT '开始时间',
+    end_time      DATETIME COMMENT '结束时间',
+    duration_ms   BIGINT COMMENT '耗时(毫秒)',
+    error_message TEXT COMMENT '错误信息',
+    result_rows   INT DEFAULT 0 COMMENT '结果行数',
+    create_time   DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间'
+) ENGINE=InnoDB COMMENT='任务执行日志表';
+
+CREATE TABLE IF NOT EXISTS schedule_job_dep (
+    id          VARCHAR(32) NOT NULL PRIMARY KEY COMMENT '主键ID',
+    job_id      VARCHAR(32) NOT NULL COMMENT '任务ID',
+    dep_job_id  VARCHAR(32) NOT NULL COMMENT '依赖任务ID',
+    dep_type    VARCHAR(50) DEFAULT 'HARD' COMMENT '依赖类型 HARD/SOFT',
+    create_time DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    UNIQUE KEY uk_job_dep (job_id, dep_job_id)
+) ENGINE=InnoDB COMMENT='任务依赖关系表';
+
+-- ============================================================
+-- 6. 通知表
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS notify_template (
+    id              VARCHAR(32) NOT NULL PRIMARY KEY COMMENT '主键ID',
+    template_code   VARCHAR(100) NOT NULL COMMENT '模板编码',
+    template_name   VARCHAR(200) NOT NULL COMMENT '模板名称',
+    channel         VARCHAR(50) NOT NULL COMMENT '渠道 MAIL/SITE/WECHAT/SMS',
+    title_template  VARCHAR(500) COMMENT '标题模板',
+    content_template TEXT COMMENT '内容模板',
+    status          TINYINT DEFAULT 1 COMMENT '状态',
+    create_time     DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    UNIQUE KEY uk_tpl_code (template_code)
+) ENGINE=InnoDB COMMENT='消息模板表';
+
+CREATE TABLE IF NOT EXISTS notify_record (
+    id            VARCHAR(32) NOT NULL PRIMARY KEY COMMENT '主键ID',
+    template_id   VARCHAR(32) COMMENT '模板ID',
+    receiver_id   VARCHAR(32) COMMENT '接收人ID',
+    receiver_type VARCHAR(50) DEFAULT 'USER' COMMENT '类型 USER/ROLE/ORG',
+    channel       VARCHAR(50) COMMENT '渠道',
+    title         VARCHAR(500) COMMENT '标题',
+    content       TEXT COMMENT '内容',
+    status        TINYINT DEFAULT 0 COMMENT '状态 0:待发送 1:已发送 2:发送失败',
+    send_time     DATETIME COMMENT '发送时间',
+    error_message VARCHAR(500) COMMENT '错误信息',
+    create_time   DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间'
+) ENGINE=InnoDB COMMENT='推送记录表';
+
+CREATE TABLE IF NOT EXISTS notify_subscription (
+    id             VARCHAR(32) NOT NULL PRIMARY KEY COMMENT '主键ID',
+    user_id        VARCHAR(32) NOT NULL COMMENT '用户ID',
+    subscribe_type VARCHAR(50) NOT NULL COMMENT '类型 REPORT/METRIC/JOB',
+    target_id      VARCHAR(32) COMMENT '目标ID',
+    channel        VARCHAR(50) DEFAULT 'SITE' COMMENT '渠道',
+    status         TINYINT DEFAULT 1 COMMENT '状态',
+    create_time    DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    UNIQUE KEY uk_sub (user_id, subscribe_type, target_id, channel)
+) ENGINE=InnoDB COMMENT='用户订阅表';
+
+-- ============================================================
+-- 7. 查询历史表
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS query_history (
+    id             VARCHAR(32) NOT NULL PRIMARY KEY COMMENT '主键ID',
+    user_id        VARCHAR(32) COMMENT '用户ID',
+    datasource_id  VARCHAR(32) COMMENT '数据源ID',
+    database_name  VARCHAR(200) COMMENT '数据库',
+    sql_text       TEXT COMMENT 'SQL文本',
+    status         TINYINT DEFAULT 1 COMMENT '状态 1:成功 0:失败',
+    cost_ms        BIGINT COMMENT '耗时(毫秒)',
+    row_count      INT DEFAULT 0 COMMENT '结果行数',
+    error_message  VARCHAR(1000) COMMENT '错误信息',
+    create_time    DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间'
+) ENGINE=InnoDB COMMENT='查询历史表';
+
+-- ============================================================
+-- 8. 可视化表
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS visual_dashboard (
+    id               VARCHAR(32) NOT NULL PRIMARY KEY COMMENT '主键ID',
+    name             VARCHAR(200) NOT NULL COMMENT '仪表板名称',
+    description      VARCHAR(500) COMMENT '描述',
+    layout           TEXT COMMENT '布局配置(JSON)',
+    refresh_interval INT DEFAULT 60 COMMENT '刷新间隔(秒)',
+    status           TINYINT DEFAULT 1 COMMENT '状态',
+    create_by        VARCHAR(32) COMMENT '创建人',
+    create_time      DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    update_time      DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '更新时间'
+) ENGINE=InnoDB COMMENT='仪表板表';
+
+CREATE TABLE IF NOT EXISTS visual_dashboard_item (
+    id            VARCHAR(32) NOT NULL PRIMARY KEY COMMENT '主键ID',
+    dashboard_id  VARCHAR(32) NOT NULL COMMENT '仪表板ID',
+    title         VARCHAR(200) COMMENT '组件标题',
+    chart_type    VARCHAR(50) DEFAULT 'TABLE' COMMENT '图表类型 BAR/LINE/PIE/TABLE/NUMBER',
+    datasource_id VARCHAR(32) COMMENT '数据源ID',
+    query_sql     TEXT COMMENT '查询SQL',
+    config        TEXT COMMENT '组件配置(JSON)',
+    pos_x         INT DEFAULT 0 COMMENT 'X坐标',
+    pos_y         INT DEFAULT 0 COMMENT 'Y坐标',
+    width         INT DEFAULT 4 COMMENT '宽度',
+    height        INT DEFAULT 4 COMMENT '高度',
+    create_time   DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    update_time   DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '更新时间'
+) ENGINE=InnoDB COMMENT='仪表板组件表';
+
+-- ============================================================
+-- 9. 初始数据
+-- ============================================================
+
+-- 默认管理员 admin / password
+INSERT INTO sys_user (id, username, password, real_name, status) VALUES
+('1', 'admin', '$2b$10$hdjujcTK4Qq.n14B3Tfgi.8Kci/7O2aGGtc4.ope8TWyYq6/GNEqO', '系统管理员', 1);
+
+-- 默认角色
+INSERT INTO sys_role (id, role_code, role_name, description) VALUES
+('1', 'SUPER_ADMIN', '超级管理员', '拥有所有权限'),
+('2', 'ADMIN', '管理员', '系统管理权限'),
+('3', 'USER', '普通用户', '基本数据访问权限');
+
+-- 默认管理员角色
+INSERT INTO sys_user_role (id, user_id, role_id) VALUES ('1', '1', '1');
+
+-- 默认组织
+INSERT INTO sys_organization (id, parent_id, org_name, org_code, org_type) VALUES
+('1', NULL, '数据混沌科技', 'DK_GROUP', 'GROUP'),
+('11', '1', '数据平台部', 'DK_DATA', 'DEPT'),
+('12', '1', '研发部', 'DK_RD', 'DEPT');
+
+INSERT INTO sys_user_org (id, user_id, org_id, is_primary) VALUES ('1', '1', '11', 1);
+
+-- 默认菜单
+INSERT INTO sys_menu (id, parent_id, name, path, component, permission, icon, type, sort_order) VALUES
+('1', NULL, '系统管理', '/system', 'Layout', NULL, 'Setting', 0, 1),
+('11', '1', '用户管理', '/system/user', 'system/user/index', 'system:user:list', 'User', 1, 1),
+('12', '1', '角色管理', '/system/role', 'system/role/index', 'system:role:list', 'Avatar', 1, 2),
+('13', '1', '菜单管理', '/system/menu', 'system/menu/index', 'system:menu:list', 'Menu', 1, 3),
+('14', '1', '组织管理', '/system/org', 'system/org/index', 'system:org:list', 'OfficeBuilding', 1, 4),
+('2', NULL, '数据管理', '/data', 'Layout', NULL, 'DataLine', 0, 2),
+('21', '2', '数据源管理', '/data/datasource', 'data/datasource/index', 'data:datasource:list', 'Connection', 1, 1),
+('22', '2', '元数据管理', '/data/metadata', 'data/metadata/index', 'data:metadata:list', 'Files', 1, 2),
+('23', '2', '数据集市', '/data/mart', 'data/mart/index', 'data:mart:list', 'Grid', 1, 3),
+('3', NULL, '查询分析', '/query', 'Layout', NULL, 'Search', 0, 3),
+('31', '3', 'SQL查询', '/query/sql', 'query/sql/index', 'query:sql:execute', 'EditPen', 1, 1),
+('32', '3', '仪表板', '/query/dashboard', 'query/dashboard/index', 'query:dashboard:view', 'PieChart', 1, 2),
+('33', '3', '分析板', '/query/analysis', 'query/analysis/index', 'query:analysis:view', 'TrendCharts', 1, 3),
+('4', NULL, '运维管理', '/ops', 'Layout', NULL, 'Operation', 0, 4),
+('41', '4', '任务调度', '/ops/schedule', 'ops/schedule/index', 'ops:schedule:list', 'Timer', 1, 1),
+('42', '4', '消息通知', '/ops/notification', 'ops/notification/index', 'ops:notification:list', 'Bell', 1, 2),
+('43', '4', '审批管理', '/ops/approval', 'ops/approval/index', 'ops:approval:list', 'Stamp', 1, 3);
+
+-- 超级管理员绑定全部菜单权限
+INSERT INTO sys_role_permission (id, role_id, permission_id, permission_type)
+SELECT CONCAT('rp_', m.id), '1', m.id, 'MENU' FROM sys_menu m;
+
+-- 默认审批流
+INSERT INTO app_approval_flow (id, flow_name, apply_type, step_order, approver_role) VALUES
+('1', '表权限审批', 'TABLE', 1, 'ADMIN'),
+('2', '报表权限审批', 'REPORT', 1, 'ADMIN'),
+('3', '数据源权限审批', 'DATASOURCE', 1, 'ADMIN');
+
+-- 默认消息模板
+INSERT INTO notify_template (id, template_code, template_name, channel, title_template, content_template) VALUES
+('1', 'SITE_NOTIFY', '站内通知', 'SITE', '【数据混沌】${title}', '${content}'),
+('2', 'TASK_FAIL', '任务失败告警', 'SITE', '【任务告警】${jobName} 执行失败', '任务 ${jobName} 于 ${time} 执行失败：${message}');
+
+-- 默认示例仪表板
+INSERT INTO visual_dashboard (id, name, description, refresh_interval, status, create_by) VALUES
+('1', '平台总览', '平台运行指标总览', 60, 1, '1');
+
+SET FOREIGN_KEY_CHECKS = 1;

@@ -1,0 +1,208 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.datakhaos</groupId>
+    <artifactId>data-khaos</artifactId>
+    <version>1.0.0-SNAPSHOT</version>
+    <packaging>pom</packaging>
+
+    <name>Data Khaos</name>
+    <description>国产化大数据基础设施全栈平台</description>
+    <url>https://github.com/pmdream/data-khaos</url>
+
+    <licenses>
+        <license>
+            <name>Apache License 2.0</name>
+            <url>https://www.apache.org/licenses/LICENSE-2.0</url>
+        </license>
+    </licenses>
+
+    <developers>
+        <developer>
+            <name>pmdream</name>
+            <email>pmdream@datakhaos.com</email>
+        </developer>
+    </developers>
+
+    <modules>
+        <module>data-khaos-common</module>
+        <!-- 共享契约模块（DTO / SPI 接口） -->
+        <module>data-khaos-auth-api</module>
+        <module>data-khaos-permission-api</module>
+        <module>data-khaos-datasource-api</module>
+        <module>data-khaos-mart-api</module>
+        <!-- 网关与业务服务 -->
+        <module>data-khaos-gateway</module>
+        <module>data-khaos-auth</module>
+        <module>data-khaos-permission</module>
+        <module>data-khaos-approval</module>
+        <module>data-khaos-datasource</module>
+        <module>data-khaos-metadata</module>
+        <module>data-khaos-mart</module>
+        <module>data-khaos-query</module>
+        <module>data-khaos-visual</module>
+        <module>data-khaos-schedule</module>
+        <module>data-khaos-notification</module>
+    </modules>
+
+    <properties>
+        <java.version>17</java.version>
+        <maven.compiler.source>${java.version}</maven.compiler.source>
+        <maven.compiler.target>${java.version}</maven.compiler.target>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+
+        <spring-boot.version>3.2.0</spring-boot.version>
+        <spring-cloud.version>2023.0.0</spring-cloud.version>
+        <spring-cloud-alibaba.version>2023.0.3.3</spring-cloud-alibaba.version>
+        <mybatis-plus.version>3.5.5</mybatis-plus.version>
+        <dm8.version>8.1.3.63</dm8.version>
+        <hutool.version>5.8.25</hutool.version>
+        <knife4j.version>4.4.0</knife4j.version>
+    </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <!-- Spring Boot -->
+            <dependency>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-dependencies</artifactId>
+                <version>${spring-boot.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+
+            <!-- Spring Cloud -->
+            <dependency>
+                <groupId>org.springframework.cloud</groupId>
+                <artifactId>spring-cloud-dependencies</artifactId>
+                <version>${spring-cloud.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+
+            <!-- Spring Cloud Alibaba（Nacos 注册中心） -->
+            <dependency>
+                <groupId>com.alibaba.cloud</groupId>
+                <artifactId>spring-cloud-alibaba-dependencies</artifactId>
+                <version>${spring-cloud-alibaba.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+
+            <!-- MyBatis-Plus（Spring Boot 3 专用 starter） -->
+            <dependency>
+                <groupId>com.baomidou</groupId>
+                <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
+                <version>${mybatis-plus.version}</version>
+            </dependency>
+
+            <!-- 达梦数据库驱动：仅 prod(达梦) profile 引入 -->
+            <dependency>
+                <groupId>com.dameng</groupId>
+                <artifactId>DmJdbcDriver18</artifactId>
+                <version>${dm8.version}</version>
+            </dependency>
+
+            <!-- Hutool 工具包 -->
+            <dependency>
+                <groupId>cn.hutool</groupId>
+                <artifactId>hutool-all</artifactId>
+                <version>${hutool.version}</version>
+            </dependency>
+
+            <!-- Knife4j API 文档 -->
+            <dependency>
+                <groupId>com.github.xiaoymin</groupId>
+                <artifactId>knife4j-openapi3-jakarta-spring-boot-starter</artifactId>
+                <version>${knife4j.version}</version>
+            </dependency>
+
+            <!-- 内部模块依赖 -->
+            <dependency>
+                <groupId>com.datakhaos</groupId>
+                <artifactId>data-khaos-common</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.datakhaos</groupId>
+                <artifactId>data-khaos-auth-api</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.datakhaos</groupId>
+                <artifactId>data-khaos-permission-api</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.datakhaos</groupId>
+                <artifactId>data-khaos-datasource-api</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.datakhaos</groupId>
+                <artifactId>data-khaos-mart-api</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <!-- 所有模块共享 Lombok（provided：不打包进启动 jar） -->
+    <dependencies>
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <scope>provided</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-maven-plugin</artifactId>
+                    <version>${spring-boot.version}</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-compiler-plugin</artifactId>
+                    <version>3.11.0</version>
+                    <configuration>
+                        <source>${java.version}</source>
+                        <target>${java.version}</target>
+                        <!-- Spring Boot 3 / Java 17+：保留参数名，供 @RequestParam/@PathVariable
+                             未显式命名时按名称绑定（等价 spring-boot-starter-parent 的 -parameters） -->
+                        <parameters>true</parameters>
+                    </configuration>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-surefire-plugin</artifactId>
+                    <version>3.2.2</version>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+    </build>
+
+    <profiles>
+        <!--
+            生产(达梦 DM8) profile：
+            - 引入达梦驱动 DmJdbcDriver18
+            - 启用 dm8 数据源配置（各服务 application-dm8.yml）
+            使用方式： mvn clean install -Pprod  或运行服务时激活 dm8 profile
+        -->
+        <profile>
+            <id>prod</id>
+            <dependencies>
+                <dependency>
+                    <groupId>com.dameng</groupId>
+                    <artifactId>DmJdbcDriver18</artifactId>
+                    <version>${dm8.version}</version>
+                </dependency>
+            </dependencies>
+        </profile>
+    </profiles>
+</project>

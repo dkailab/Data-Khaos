@@ -1,0 +1,17 @@
+package com.datakhaos.permission.entity;
+
+import com.baomidou.mybatisplus.annotation.TableName;
+import com.datakhaos.common.entity.BaseEntity;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+
+/** 角色表（权限侧只读） */
+@Data
+@EqualsAndHashCode(callSuper = true)
+@TableName("sys_role")
+public class SysRole extends BaseEntity {
+    private String roleCode;
+    private String roleName;
+    private String description;
+    private Integer status;
+}

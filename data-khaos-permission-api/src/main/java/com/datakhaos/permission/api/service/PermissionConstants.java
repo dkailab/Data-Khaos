@@ -1,0 +1,36 @@
+package com.datakhaos.permission.api.service;
+
+/**
+ * 权限标识常量
+ */
+public interface PermissionConstants {
+
+    /** 超级管理员角色 */
+    String ROLE_SUPER_ADMIN = "SUPER_ADMIN";
+
+    String PERM_USER_LIST = "system:user:list";
+    String PERM_USER_EDIT = "system:user:edit";
+    String PERM_ROLE_LIST = "system:role:list";
+    String PERM_ROLE_EDIT = "system:role:edit";
+    String PERM_MENU_LIST = "system:menu:list";
+    String PERM_MENU_EDIT = "system:menu:edit";
+    String PERM_ORG_LIST = "system:org:list";
+    String PERM_ORG_EDIT = "system:org:edit";
+
+    String PERM_DS_LIST = "data:datasource:list";
+    String PERM_DS_EDIT = "data:datasource:edit";
+    String PERM_META_LIST = "data:metadata:list";
+    String PERM_MART_LIST = "data:mart:list";
+    String PERM_MART_EDIT = "data:mart:edit";
+
+    String PERM_SQL_EXECUTE = "query:sql:execute";
+    String PERM_DASHBOARD_VIEW = "query:dashboard:view";
+    String PERM_ANALYSIS_VIEW = "query:analysis:view";
+
+    String PERM_SCHEDULE_LIST = "ops:schedule:list";
+    String PERM_SCHEDULE_EDIT = "ops:schedule:edit";
+    String PERM_NOTIFY_LIST = "ops:notification:list";
+    String PERM_NOTIFY_EDIT = "ops:notification:edit";
+    String PERM_APPROVAL_LIST = "ops:approval:list";
+    String PERM_APPROVAL_EDIT = "ops:approval:edit";
+}

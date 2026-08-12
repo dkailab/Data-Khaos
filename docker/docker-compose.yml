@@ -1,0 +1,246 @@
+name: data-khaos
+
+# ============================================================
+# Data Khaos - 一键启动编排（开发环境）
+#
+#   基础设施：MySQL 8、Redis 7、Nacos（standalone）
+#   业务服务：网关 + 10 个微服务，共 11 个应用容器
+#
+#   启动：  cd docker && docker compose up -d --build
+#   停止：  docker compose down
+#   查看：  docker compose ps / docker compose logs -f <service>
+#
+#   说明：
+#   - 服务默认连 MySQL（与 application.yml 默认一致）；生产使用达梦
+#     DM8 时，把 MYSQL_HOST 相关环境变量替换为 DM8 连接即可。
+#   - 应用容器未配置健康检查（镜像精简），依赖 infra 健康检查 +
+#     restart: on-failure 自动拉起。
+# ============================================================
+
+x-app-common: &app-common
+  build:
+    context: ..
+    dockerfile: docker/Dockerfile
+  restart: on-failure
+  networks:
+    - dk-net
+  environment: &app-env
+    MYSQL_HOST: ${MYSQL_HOST:-mysql}
+    MYSQL_PORT: ${MYSQL_PORT:-3306}
+    MYSQL_USERNAME: ${MYSQL_USERNAME:-root}
+    MYSQL_PASSWORD: ${MYSQL_PASSWORD:-root123456}
+    NACOS_ADDR: ${NACOS_ADDR:-nacos:8848}
+    REDIS_HOST: ${REDIS_HOST:-redis}
+    REDIS_PORT: ${REDIS_PORT:-6379}
+    REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+    JWT_SECRET: ${JWT_SECRET:-data-khaos-jwt-secret-key-2026-hs256-0123456789}
+    JWT_EXPIRE_SECONDS: ${JWT_EXPIRE_SECONDS:-7200}
+    AES_KEY: ${AES_KEY:-data-khaos-aes-2026}
+    CAPTCHA_ENABLED: ${CAPTCHA_ENABLED:-false}
+  depends_on:
+    mysql:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+    nacos:
+      condition: service_started
+
+services:
+  # ---------- 基础设施 ----------
+  mysql:
+    image: mysql:8.0
+    container_name: dk-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_PASSWORD:-root123456}
+      TZ: Asia/Shanghai
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_general_ci
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ../db/mysql-init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-p$$MYSQL_ROOT_PASSWORD"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    restart: unless-stopped
+    networks:
+      - dk-net
+
+  redis:
+    image: redis:7-alpine
+    container_name: dk-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+    networks:
+      - dk-net
+
+  nacos:
+    image: nacos/nacos-server:v2.4.3
+    container_name: dk-nacos
+    environment:
+      MODE: standalone
+      NACOS_AUTH_ENABLE: "false"
+      JVM_XMS: 256m
+      JVM_XMX: 512m
+    ports:
+      - "8848:8848"
+      - "9848:9848"   # Nacos 2.x gRPC 端口（服务发现必需）
+    volumes:
+      - nacos-data:/home/nacos/data
+    restart: unless-stopped
+    networks:
+      - dk-net
+
+  # ---------- API 网关 ----------
+  gateway:
+    <<: *app-common
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      args:
+        MODULE: data-khaos-gateway
+    container_name: dk-gateway
+    ports:
+      - "8080:8080"
+
+  # ---------- 认证中心 ----------
+  auth:
+    <<: *app-common
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      args:
+        MODULE: data-khaos-auth
+    container_name: dk-auth
+    ports:
+      - "8081:8081"
+
+  # ---------- 权限系统 ----------
+  permission:
+    <<: *app-common
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      args:
+        MODULE: data-khaos-permission
+    container_name: dk-permission
+    ports:
+      - "8082:8082"
+
+  # ---------- 权限审批 ----------
+  approval:
+    <<: *app-common
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      args:
+        MODULE: data-khaos-approval
+    container_name: dk-approval
+    ports:
+      - "8083:8083"
+
+  # ---------- 数据源接入 ----------
+  datasource:
+    <<: *app-common
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      args:
+        MODULE: data-khaos-datasource
+    container_name: dk-datasource
+    ports:
+      - "8084:8084"
+
+  # ---------- 元数据中心 ----------
+  metadata:
+    <<: *app-common
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      args:
+        MODULE: data-khaos-metadata
+    container_name: dk-metadata
+    ports:
+      - "8085:8085"
+
+  # ---------- 数据集市 ----------
+  mart:
+    <<: *app-common
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      args:
+        MODULE: data-khaos-mart
+    container_name: dk-mart
+    ports:
+      - "8086:8086"
+
+  # ---------- SQL 查询平台 ----------
+  query:
+    <<: *app-common
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      args:
+        MODULE: data-khaos-query
+    container_name: dk-query
+    ports:
+      - "8087:8087"
+
+  # ---------- 可视化引擎 ----------
+  visual:
+    <<: *app-common
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      args:
+        MODULE: data-khaos-visual
+    container_name: dk-visual
+    ports:
+      - "8088:8088"
+
+  # ---------- 调度系统 ----------
+  schedule:
+    <<: *app-common
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      args:
+        MODULE: data-khaos-schedule
+    container_name: dk-schedule
+    ports:
+      - "8089:8089"
+
+  # ---------- 推送系统 ----------
+  notification:
+    <<: *app-common
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      args:
+        MODULE: data-khaos-notification
+    container_name: dk-notification
+    ports:
+      - "8090:8090"
+
+volumes:
+  mysql-data:
+  redis-data:
+  nacos-data:
+
+networks:
+  dk-net:
+    driver: bridge

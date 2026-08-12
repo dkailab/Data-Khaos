@@ -1,0 +1,11 @@
+# Data Khaos - Docker build context ignore
+# 构建上下文为仓库根目录(code/)，排除无需进入镜像的目录
+**/target/
+data-khaos-web/
+data-khaos-web/node_modules/
+docs/
+db/
+docker/
+.idea/
+*.iml
+**/.DS_Store
