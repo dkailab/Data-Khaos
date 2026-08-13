@@ -1241,8 +1241,8 @@ onMounted(() => {
   overflow: auto;
   display: grid;
   grid-template-columns: repeat(12, 1fr);
-  grid-auto-rows: minmax(220px, max-content);
-  grid-template-rows: auto;
+  /* 行高严格按内容撑开；不得用 min-content/固定值，否则分析板内容溢出压盖后续板 */
+  grid-auto-rows: max-content;
   grid-auto-flow: row;
   gap: 16px;
   padding: 16px;
@@ -1284,18 +1284,17 @@ onMounted(() => {
 /* ============ 分析板体 + 组件 ============ */
 .board-body {
   flex: 1 0 auto;
-  min-height: 0;
   display: grid;
   grid-template-columns: repeat(12, 1fr);
   /* 【BI-Dashboard 约束】固定行高，行高确定则组件 span 高度确定，绝不重叠；
-     组件高度 = span 行数 × 140px，超出部分在卡片内滚动，不溢出压盖 */
+     组件高度 = span 行数 × 140px */
   grid-auto-rows: 140px;
   /* 普通流式排列，不自动回填空隙(dense)，避免卡片被 Grid 重新排布造成堆叠 */
   grid-auto-flow: row;
   gap: 10px;
   padding: 10px;
-  /* 滚动超出内容，不允许组件溢出分析板 → 避免分析板内卡片溢出到外面压盖其他分析板 */
-  overflow: auto;
+  /* 禁止滚动约束：board 随内容增高，行高由 max-content 撑开，卡片不会溢出压盖其他分析板 */
+  overflow: visible;
 }
 .board-grid-item {
   background: var(--card-bg);
