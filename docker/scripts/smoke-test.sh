@@ -3,7 +3,7 @@
 # Data Khaos - 启动冒烟 / 集成测试脚本
 #
 # 前置：docker compose up -d --build 已执行完毕，网关可访问
-# 用法： ./scripts/smoke-test.sh [BASE_URL]    默认 http://localhost:8080
+# 用法： ./scripts/smoke-test.sh [BASE_URL]    默认 http://localhost:8099
 #
 # 覆盖链路：
 #   登录(auth) → 网关鉴权(JWT) → 各下游服务(permission/datasource/
@@ -11,7 +11,7 @@
 # ============================================================
 set -u
 
-BASE_URL="${1:-http://localhost:8080}"
+BASE_URL="${1:-http://localhost:8099}"
 GATEWAY="${BASE_URL}/api"
 ADMIN_USER="${ADMIN_USER:-admin}"
 ADMIN_PASS="${ADMIN_PASS:-password}"

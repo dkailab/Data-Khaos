@@ -138,7 +138,10 @@ const menus: MenuItem[] = [
   {
     title: 'SQL 查询',
     icon: 'EditPen',
-    children: [{ title: '查询工作台', path: '/query/query' }],
+    children: [
+      { title: '查询工作台', path: '/query/query' },
+      { title: '即席分析', path: '/visual/adhoc' },
+    ],
   },
   {
     title: '可视化',

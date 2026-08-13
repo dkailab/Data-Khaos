@@ -128,7 +128,7 @@
 
 | 服务 | 端口 |
 |------|------|
-| data-khaos-gateway | 8080 |
+| data-khaos-gateway | 8099 |
 | data-khaos-auth | 8081 |
 | data-khaos-permission | 8082 |
 | data-khaos-approval | 8083 |
@@ -146,7 +146,7 @@
 ## 6. 部署与运维
 
 - 开发：`cd docker && docker compose up -d --build` 一键拉起；`smoke-test.sh` 冒烟测试
-- 前端：`cd data-khaos-web && npm install && npm run dev`（代理到网关 8080）
+- 前端：`cd data-khaos-web && npm install && npm run dev`（代理到网关 8099）
 - 生产：`mvn clean install -Pprod`（引入达梦驱动并激活 dm8 配置）
 - 数据库脚本：`db/init.sql`、`db/mysql-init.sql`、`db/seed-dashboards.sql`、`db/seed-demo.sql`
 

@@ -1,5 +1,16 @@
-import { del, get, post, put } from './request'
-import type { AdhocQueryRequest, PageResult, QueryResult, VisualBoard, VisualDashboard, VisualDashboardItem, VisualDashboardVersion } from '@/types'
+import request, { del, get, post, put } from './request'
+import type {
+  AdhocExecuteResponse,
+  AdhocQueryRequest,
+  PageResult,
+  QueryResult,
+  VisualAdhocHistory,
+  VisualAdhocQuery,
+  VisualBoard,
+  VisualDashboard,
+  VisualDashboardItem,
+  VisualDashboardVersion,
+} from '@/types'
 
 /** 分页查询仪表板 */
 export function pageDashboards(params: Record<string, any>) {
@@ -77,9 +88,59 @@ export function rollbackDashboard(id: string, versionId: string) {
   return post<void>(`/visual/dashboard/${id}/rollback/${versionId}`)
 }
 
-/** 即席分析查询 */
+/** 即席分析查询（自动审核 + 表权限 + 参数解析 + 行数上限） */
 export function adhocQuery(data: AdhocQueryRequest) {
-  return post<QueryResult>('/visual/analysis/execute', data)
+  return post<AdhocExecuteResponse>('/visual/analysis/execute', data)
+}
+
+/** 保存即席查询（新增/更新，传 id 为更新） */
+export function saveAdhocQuery(data: Partial<VisualAdhocQuery> & { sql: string; datasourceId: string; name: string }) {
+  return post<void>('/visual/analysis/save', data)
+}
+
+/** 收藏即席查询列表（当前用户） */
+export function listAdhocQueries(params: Record<string, any>) {
+  return get<PageResult<VisualAdhocQuery>>('/visual/analysis/saved', params)
+}
+
+/** 收藏即席查询详情 */
+export function getAdhocQuery(id: string) {
+  return get<VisualAdhocQuery>(`/visual/analysis/saved/${id}`)
+}
+
+/** 删除收藏即席查询 */
+export function deleteAdhocQuery(id: string) {
+  return del<void>(`/visual/analysis/saved/${id}`)
+}
+
+/** 即席查询执行历史（当前用户） */
+export function adhocHistory(params: Record<string, any>) {
+  return get<PageResult<VisualAdhocHistory>>('/visual/analysis/history', params)
+}
+
+/** 导出即席查询结果为 CSV（二进制下载） */
+export async function exportAdhoc(data: AdhocQueryRequest) {
+  const resp = await request.post('/visual/analysis/export', data, { responseType: 'text' })
+  const csv = (resp as any).data as string
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = 'adhoc_result.csv'
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+/** 将即席查询存为仪表板组件，返回组件ID */
+export function saveAdhocAsItem(data: {
+  dashboardId: string
+  title: string
+  chartType: string
+  datasourceId: string
+  sql: string
+  config?: string
+}) {
+  return post<string>('/visual/analysis/save-as-item', data)
 }
 
 /* ==================== 分析板 ==================== */

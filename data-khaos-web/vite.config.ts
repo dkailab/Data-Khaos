@@ -16,7 +16,7 @@ export default defineConfig({
     proxy: {
       // 网关统一入口：所有 /api 前缀请求转发到后端网关
       '/api': {
-        target: 'http://localhost:8080',
+        target: 'http://localhost:8099',
         changeOrigin: true,
       },
     },

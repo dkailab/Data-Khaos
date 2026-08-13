@@ -478,6 +478,36 @@ CREATE INDEX idx_board_dashboard ON visual_board(dashboard_id);
 
 ALTER TABLE visual_dashboard_version ADD COLUMN boards_json LONGTEXT COMMENT '分析板快照(JSON数组)' AFTER items_json;
 
+-- 8.4 即席查询收藏表
+CREATE TABLE IF NOT EXISTS visual_adhoc_query (
+    id           VARCHAR(32) NOT NULL PRIMARY KEY COMMENT '主键ID',
+    name         VARCHAR(200) NOT NULL COMMENT '查询名称',
+    datasource_id VARCHAR(32) COMMENT '数据源ID',
+    sql_text     TEXT COMMENT '查询SQL（支持 ${param} 占位符）',
+    params_json  TEXT COMMENT '默认参数（JSON: Map<String,Object>）',
+    folder       VARCHAR(100) COMMENT '分组/文件夹',
+    create_by    VARCHAR(32) COMMENT '创建人',
+    create_time  DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    update_time  DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '更新时间'
+) ENGINE=InnoDB COMMENT='即席查询收藏表';
+CREATE INDEX idx_ahq_user ON visual_adhoc_query(create_by);
+
+-- 8.5 即席查询执行历史表
+CREATE TABLE IF NOT EXISTS visual_adhoc_history (
+    id           VARCHAR(32) NOT NULL PRIMARY KEY COMMENT '主键ID',
+    adhoc_id     VARCHAR(32) COMMENT '关联收藏查询ID（直接执行为空）',
+    user_id      VARCHAR(32) COMMENT '执行用户ID',
+    datasource_id VARCHAR(32) COMMENT '数据源ID',
+    sql_text     TEXT COMMENT '实际执行SQL（已解析参数）',
+    status       TINYINT DEFAULT 1 COMMENT '1:成功 0:失败',
+    cost_ms      BIGINT DEFAULT 0 COMMENT '耗时(ms)',
+    row_count    INT DEFAULT 0 COMMENT '结果行数',
+    error_message VARCHAR(1000) COMMENT '错误信息',
+    create_time  DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间'
+) ENGINE=InnoDB COMMENT='即席查询执行历史表';
+CREATE INDEX idx_ahh_user ON visual_adhoc_history(user_id);
+CREATE INDEX idx_ahh_adhoc ON visual_adhoc_history(adhoc_id);
+
 -- ============================================================
 -- 9. 初始数据
 -- ============================================================
@@ -518,6 +548,7 @@ INSERT INTO sys_menu (id, parent_id, name, path, component, permission, icon, ty
 ('31', '3', 'SQL查询', '/query/sql', 'query/sql/index', 'query:sql:execute', 'EditPen', 1, 1),
 ('32', '3', '仪表板', '/query/dashboard', 'query/dashboard/index', 'query:dashboard:view', 'PieChart', 1, 2),
 ('33', '3', '分析板', '/query/analysis', 'query/analysis/index', 'query:analysis:view', 'TrendCharts', 1, 3),
+('34', '3', '即席分析', '/visual/adhoc', 'visual/adhoc/index', 'visual:adhoc:execute', 'Magic', 1, 4),
 ('4', NULL, '运维管理', '/ops', 'Layout', NULL, 'Operation', 0, 4),
 ('41', '4', '任务调度', '/ops/schedule', 'ops/schedule/index', 'ops:schedule:list', 'Timer', 1, 1),
 ('42', '4', '消息通知', '/ops/notification', 'ops/notification/index', 'ops:notification:list', 'Bell', 1, 2),

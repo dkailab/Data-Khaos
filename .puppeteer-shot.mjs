@@ -4,7 +4,7 @@ const CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
 const base = 'http://localhost:5173'
 const dashId = '2087425001321390081'
 
-const login = await fetch('http://localhost:8080/api/auth/login', {
+const login = await fetch('http://localhost:8099/api/auth/login', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({ username: 'admin', password: 'password' }),

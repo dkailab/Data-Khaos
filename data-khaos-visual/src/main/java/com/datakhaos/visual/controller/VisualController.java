@@ -2,10 +2,16 @@ package com.datakhaos.visual.controller;
 
 import com.datakhaos.common.model.PageResult;
 import com.datakhaos.common.model.R;
+import com.datakhaos.common.security.MetadataHolder;
 import com.datakhaos.datasource.api.model.QueryResult;
+import com.datakhaos.visual.dto.AdhocExecuteResponse;
 import com.datakhaos.visual.dto.AdhocQueryRequest;
+import com.datakhaos.visual.dto.AdhocSaveRequest;
 import com.datakhaos.visual.dto.DrillRequest;
 import com.datakhaos.visual.dto.PublishRequest;
+import com.datakhaos.visual.dto.SaveAsItemRequest;
+import com.datakhaos.visual.entity.VisualAdhocHistory;
+import com.datakhaos.visual.entity.VisualAdhocQuery;
 import com.datakhaos.visual.entity.VisualBoard;
 import com.datakhaos.visual.entity.VisualDashboard;
 import com.datakhaos.visual.entity.VisualDashboardItem;
@@ -14,6 +20,9 @@ import com.datakhaos.visual.service.VisualService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -172,9 +181,61 @@ public class VisualController {
 
     // ==================== 即席分析查询 ====================
 
-    @Operation(summary = "即席分析查询")
+    @Operation(summary = "即席分析查询（自动审核+表权限+参数解析+行数上限）")
     @PostMapping("/analysis/execute")
-    public R<QueryResult> adhoc(@RequestBody AdhocQueryRequest request) {
-        return R.ok(visualService.executeAdhoc(request.getDatasourceId(), request.getSql()));
+    public R<AdhocExecuteResponse> adhoc(@RequestBody AdhocQueryRequest request) {
+        return R.ok(visualService.executeAdhoc(request));
+    }
+
+    @Operation(summary = "保存即席查询（新增/更新，有 id 则更新）")
+    @PostMapping("/analysis/save")
+    public R<Void> saveAdhoc(@RequestBody AdhocSaveRequest request) {
+        visualService.saveAdhoc(request);
+        return R.ok();
+    }
+
+    @Operation(summary = "收藏即席查询列表（当前用户）")
+    @GetMapping("/analysis/saved")
+    public R<PageResult<VisualAdhocQuery>> savedAdhoc(@RequestParam(defaultValue = "1") long current,
+                                                      @RequestParam(defaultValue = "10") long size,
+                                                      @RequestParam(required = false) String keyword) {
+        return R.ok(visualService.adhocQueryPage(current, size, keyword, MetadataHolder.getUserId()));
+    }
+
+    @Operation(summary = "收藏即席查询详情")
+    @GetMapping("/analysis/saved/{id}")
+    public R<VisualAdhocQuery> adhocDetail(@PathVariable String id) {
+        return R.ok(visualService.getAdhocQuery(id));
+    }
+
+    @Operation(summary = "删除收藏即席查询")
+    @DeleteMapping("/analysis/saved/{id}")
+    public R<Void> deleteAdhoc(@PathVariable String id) {
+        visualService.deleteAdhocQuery(id);
+        return R.ok();
+    }
+
+    @Operation(summary = "即席查询执行历史（当前用户）")
+    @GetMapping("/analysis/history")
+    public R<PageResult<VisualAdhocHistory>> adhocHistory(@RequestParam(defaultValue = "1") long current,
+                                                          @RequestParam(defaultValue = "10") long size) {
+        return R.ok(visualService.adhocHistoryPage(current, size, MetadataHolder.getUserId()));
+    }
+
+    @Operation(summary = "导出即席查询结果为 CSV")
+    @PostMapping("/analysis/export")
+    public ResponseEntity<String> exportAdhoc(@RequestBody AdhocQueryRequest request) {
+        AdhocExecuteResponse resp = visualService.executeAdhoc(request);
+        String csv = visualService.toCsv(resp.getResult());
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=adhoc_result.csv")
+                .contentType(MediaType.TEXT_PLAIN)
+                .body(csv);
+    }
+
+    @Operation(summary = "将即席查询存为仪表板组件")
+    @PostMapping("/analysis/save-as-item")
+    public R<String> saveAdhocAsItem(@RequestBody SaveAsItemRequest request) {
+        return R.ok(visualService.saveAdhocAsItem(request));
     }
 }

@@ -9,7 +9,7 @@ Data Khaos 共 11 个可运行服务 + 3 个基础设施组件。开发环境通
 | MySQL 8 | dk-mysql | 3306 | 业务库（开发默认），自动执行 `db/mysql-init.sql` |
 | Redis 7 | dk-redis | 6379 | 网关限流、会话/验证码缓存 |
 | Nacos | dk-nacos | 8848 / 9848 | 服务注册与发现（standalone） |
-| 网关 | dk-gateway | 8080 | 统一入口 + JWT 鉴权 + 路由 |
+| 网关 | dk-gateway | 8099 | 统一入口 + JWT 鉴权 + 路由 |
 | 认证中心 | dk-auth | 8081 | 登录 / SSO / 验证码 / 用户 / 角色 |
 | 权限服务 | dk-permission | 8082 | RBAC、行/列/表权限、组织 |
 | 审批服务 | dk-approval | 8083 | 权限申请 / 审批流 |
@@ -40,10 +40,10 @@ docker compose ps             # 等待所有服务 running
 
 ### 2.3 验证
 
-- 网关就绪：`curl http://localhost:8080/api/auth/captcha` 返回 `"code":0`
-- 登录：`curl -X POST -H 'Content-Type: application/json' -d '{"username":"admin","password":"password"}' http://localhost:8080/api/auth/login`
+- 网关就绪：`curl http://localhost:8099/api/auth/captcha` 返回 `"code":0`
+- 登录：`curl -X POST -H 'Content-Type: application/json' -d '{"username":"admin","password":"password"}' http://localhost:8099/api/auth/login`
 - 服务注册：浏览器打开 `http://localhost:8848/nacos`（默认无鉴权）查看 11 个服务是否全部注册
-- 接口文档（网关下发的各服务 Knife4j）：`http://localhost:8080/doc.html`
+- 接口文档（网关下发的各服务 Knife4j）：`http://localhost:8099/doc.html`
 
 ## 3. 生产部署（达梦 DM8）
 

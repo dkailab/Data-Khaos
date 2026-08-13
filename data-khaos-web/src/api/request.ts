@@ -5,7 +5,7 @@ import type { R } from '@/types'
 
 /**
  * Axios 实例：
- * - baseURL 取 .env.development 的 VITE_API_BASE（/api），vite dev server 代理到网关 8080
+ * - baseURL 取 .env.development 的 VITE_API_BASE（/api），vite dev server 代理到网关 8099
  * - 请求拦截器：注入 Authorization: Bearer <token>（后端 AuthGlobalFilter 校验 JWT）
  * - 响应拦截器：统一解包 R<T>（code === 0 成功），401 跳转登录，统一错误提示
  */

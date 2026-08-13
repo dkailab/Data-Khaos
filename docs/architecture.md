@@ -24,7 +24,7 @@ Data Khaos 采用微服务架构，基于 Spring Cloud 技术栈。整体分为�
 
 | 服务名称 | 端口 | 说明 |
 |---------|------|------|
-| data-khaos-gateway | 8080 | API 网关 |
+| data-khaos-gateway | 8099 | API 网关 |
 | data-khaos-auth | 8081 | 认证中心 |
 | data-khaos-permission | 8082 | 权限服务 |
 | data-khaos-approval | 8083 | 审批服务 |

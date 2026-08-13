@@ -143,6 +143,12 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/visual/dashboard/DashboardEditor.vue'),
         meta: { title: 'DK实时分析板' },
       },
+      {
+        path: 'visual/adhoc',
+        name: 'VisualAdhoc',
+        component: () => import('@/views/visual/adhoc/AdhocWorkbench.vue'),
+        meta: { title: '即席分析' },
+      },
       // 调度中心
       {
         path: 'schedule/job',

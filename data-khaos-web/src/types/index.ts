@@ -520,6 +520,42 @@ export interface VisualBoard {
 export interface AdhocQueryRequest {
   datasourceId: string
   sql: string
+  params?: Record<string, any>
+  adhocId?: string
+}
+
+/** 即席查询执行响应 */
+export interface AdhocExecuteResponse {
+  result: QueryResult
+  truncated: boolean
+  originalRowCount: number
+}
+
+/** 收藏的即席查询 */
+export interface VisualAdhocQuery {
+  id?: string
+  name?: string
+  datasourceId?: string
+  sqlText?: string
+  params?: Record<string, any>
+  folder?: string
+  createBy?: string
+  createTime?: string
+  updateTime?: string
+}
+
+/** 即席查询执行历史 */
+export interface VisualAdhocHistory {
+  id?: string
+  adhocId?: string
+  userId?: string
+  datasourceId?: string
+  sqlText?: string
+  status?: number
+  costMs?: number
+  rowCount?: number
+  errorMessage?: string
+  createTime?: string
 }
 
 /* ==================== 调度 ==================== */

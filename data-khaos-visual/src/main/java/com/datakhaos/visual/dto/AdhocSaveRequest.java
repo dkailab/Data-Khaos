@@ -6,12 +6,18 @@ import java.io.Serializable;
 import java.util.Map;
 
 /**
- * 即席分析查询请求
+ * 保存即席查询（收藏）请求
  */
 @Data
-public class AdhocQueryRequest implements Serializable {
+public class AdhocSaveRequest implements Serializable {
 
     private static final long serialVersionUID = 1L;
+
+    /** 收藏ID（更新时必填） */
+    private String id;
+
+    /** 查询名称 */
+    private String name;
 
     /** 数据源ID */
     private String datasourceId;
@@ -19,9 +25,9 @@ public class AdhocQueryRequest implements Serializable {
     /** 查询SQL（支持 ${param} 占位符） */
     private String sql;
 
-    /** SQL 中的参数值：key 为占位符名（不含 ${}），value 为值 */
+    /** 默认参数：key 为占位符名，value 为默认值 */
     private Map<String, Object> params;
 
-    /** 关联的收藏查询ID（可选，用于历史关联） */
-    private String adhocId;
+    /** 分组/文件夹（可选） */
+    private String folder;
 }

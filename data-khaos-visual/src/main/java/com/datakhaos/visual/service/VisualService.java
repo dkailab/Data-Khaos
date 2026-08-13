@@ -8,12 +8,23 @@ import com.datakhaos.common.model.PageResult;
 import com.datakhaos.common.model.R;
 import com.datakhaos.common.model.ResultCode;
 import com.datakhaos.common.security.MetadataHolder;
+import com.datakhaos.common.security.SqlAuditUtil;
 import com.datakhaos.datasource.api.connector.DatasourceApiClient;
+import com.datakhaos.datasource.api.model.ColumnInfo;
 import com.datakhaos.datasource.api.model.QueryResult;
+import com.datakhaos.permission.api.service.PermissionApiClient;
+import com.datakhaos.visual.dto.AdhocExecuteResponse;
+import com.datakhaos.visual.dto.AdhocQueryRequest;
+import com.datakhaos.visual.dto.AdhocSaveRequest;
+import com.datakhaos.visual.dto.SaveAsItemRequest;
+import com.datakhaos.visual.entity.VisualAdhocHistory;
+import com.datakhaos.visual.entity.VisualAdhocQuery;
 import com.datakhaos.visual.entity.VisualBoard;
 import com.datakhaos.visual.entity.VisualDashboard;
 import com.datakhaos.visual.entity.VisualDashboardItem;
 import com.datakhaos.visual.entity.VisualDashboardVersion;
+import com.datakhaos.visual.mapper.VisualAdhocHistoryMapper;
+import com.datakhaos.visual.mapper.VisualAdhocQueryMapper;
 import com.datakhaos.visual.mapper.VisualBoardMapper;
 import com.datakhaos.visual.mapper.VisualDashboardItemMapper;
 import com.datakhaos.visual.mapper.VisualDashboardMapper;
@@ -22,11 +33,14 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * 可视化服务：仪表板/组件管理与数据查询。
@@ -41,7 +55,18 @@ public class VisualService {
     private final VisualDashboardVersionMapper versionMapper;
     private final VisualBoardMapper boardMapper;
     private final DatasourceApiClient datasourceApiClient;
+    private final VisualAdhocQueryMapper adhocQueryMapper;
+    private final VisualAdhocHistoryMapper adhocHistoryMapper;
+    private final PermissionApiClient permissionApiClient;
     private final ObjectMapper objectMapper;
+
+    /** 即席查询结果行数上限（防止大结果集拖垮前端/网络） */
+    @Value("${visual.adhoc.max-rows:10000}")
+    private int adhocMaxRows;
+
+    /** 即席查询是否开启表权限校验 */
+    @Value("${visual.adhoc.permission-check:true}")
+    private boolean adhocPermissionCheck;
 
     // ==================== 仪表板 ====================
 
@@ -454,12 +479,141 @@ public class VisualService {
         }
     }
 
-    /** 即席分析查询（分析板） */
-    public QueryResult executeAdhoc(String datasourceId, String sql) {
-        if (StrUtil.isBlank(datasourceId)) {
+    /** 即席分析查询（分析板）—— 含 SQL 审核 / 表权限 / 参数解析 / 行数上限 / 执行历史 */
+    public AdhocExecuteResponse executeAdhoc(AdhocQueryRequest request) {
+        if (StrUtil.isBlank(request.getDatasourceId())) {
             throw new BusinessException("数据源ID不能为空");
         }
-        return executeOnDataSource(datasourceId, sql);
+        if (StrUtil.isBlank(request.getSql())) {
+            throw new BusinessException("SQL 不能为空");
+        }
+        String userId = MetadataHolder.getUserId();
+
+        // 1. SQL 审核（拦截 DDL / 危险操作 / 多语句注入）
+        String sql = SqlAuditUtil.audit(request.getSql());
+        // 2. 参数解析 ${param}
+        sql = resolveParams(sql, request.getParams());
+
+        // 3. 表权限校验（超级管理员跳过）
+        if (adhocPermissionCheck && !MetadataHolder.isSuperAdmin() && StrUtil.isNotBlank(userId)) {
+            checkTablePermission(request.getDatasourceId(), sql, userId);
+        }
+
+        // 4. 执行 + 记录历史
+        long start = System.currentTimeMillis();
+        try {
+            R<QueryResult> result = datasourceApiClient.executeRaw(request.getDatasourceId(), sql);
+            long cost = System.currentTimeMillis() - start;
+            if (result == null || result.getCode() != 0) {
+                String error = result == null ? "查询失败" : result.getMsg();
+                saveAdhocHistory(request, userId, sql, 0, cost, 0, error);
+                throw new BusinessException(error);
+            }
+            QueryResult data = result.getData();
+            if (data == null) data = new QueryResult();
+
+            // 行数上限截断
+            List<Map<String, Object>> rows = data.getRows();
+            int original = rows == null ? 0 : rows.size();
+            boolean truncated = false;
+            if (rows != null && rows.size() > adhocMaxRows) {
+                data.setRows(new ArrayList<>(rows.subList(0, adhocMaxRows)));
+                truncated = true;
+            }
+            data.setRowCount(data.getRows() == null ? 0 : data.getRows().size());
+
+            saveAdhocHistory(request, userId, sql, 1, cost, data.getRowCount(), null);
+            AdhocExecuteResponse resp = new AdhocExecuteResponse();
+            resp.setResult(data);
+            resp.setTruncated(truncated);
+            resp.setOriginalRowCount(truncated ? original : data.getRowCount());
+            return resp;
+        } catch (BusinessException be) {
+            throw be;
+        } catch (Exception e) {
+            long cost = System.currentTimeMillis() - start;
+            saveAdhocHistory(request, userId, sql, 0, cost, 0, e.getMessage());
+            throw new BusinessException("即席查询执行失败: " + e.getMessage());
+        }
+    }
+
+    /** 解析 SQL 中的 ${param} 占位符：数字原样替换，其余加单引号转义；缺失参数直接报错 */
+    private String resolveParams(String sql, Map<String, Object> params) {
+        Pattern pattern = Pattern.compile("\\$\\{([a-zA-Z0-9_]+)}");
+        Matcher matcher = pattern.matcher(sql);
+        if (!matcher.find()) {
+            // SQL 无占位符，直接返回
+            return sql;
+        }
+        // SQL 含占位符：无论是否传参，都需校验并提供参数值，缺失即报错
+        if (params == null) {
+            params = Collections.emptyMap();
+        }
+        matcher.reset();
+        StringBuffer sb = new StringBuffer();
+        while (matcher.find()) {
+            String key = matcher.group(1);
+            if (!params.containsKey(key)) {
+                throw new BusinessException("SQL 参数缺失: " + key);
+            }
+            Object val = params.get(key);
+            matcher.appendReplacement(sb, Matcher.quoteReplacement(renderParamValue(val)));
+        }
+        matcher.appendTail(sb);
+        return sb.toString();
+    }
+
+    private String renderParamValue(Object val) {
+        if (val == null) {
+            return "NULL";
+        }
+        String s = String.valueOf(val);
+        if (s.matches("-?\\d+(\\.\\d+)?")) {
+            return s; // 数字原样
+        }
+        return "'" + s.replace("'", "''") + "'"; // 字符串加引号
+    }
+
+    /** 提取 FROM 表并校验用户表权限 */
+    private void checkTablePermission(String datasourceId, String sql, String userId) {
+        Matcher matcher = FROM_PATTERN.matcher(sql);
+        if (!matcher.find()) {
+            return;
+        }
+        String table = matcher.group(1);
+        String database = null;
+        int dot = table.indexOf('.');
+        if (dot > 0) {
+            database = table.substring(0, dot);
+            table = table.substring(dot + 1);
+        }
+        boolean allowed = permissionApiClient.checkTablePermission(userId, datasourceId, database, table, "SELECT");
+        if (!allowed) {
+            throw new BusinessException("没有对表 " + (database == null ? "" : database + ".") + table + " 的查询权限");
+        }
+    }
+
+    /** 简单提取 FROM 表名（含可选 schema 前缀） */
+    private static final Pattern FROM_PATTERN = Pattern.compile(
+            "\\bFROM\\s+([a-zA-Z_][\\w$]*(?:\\.[a-zA-Z_][\\w$]*)*)",
+            Pattern.CASE_INSENSITIVE);
+
+    private void saveAdhocHistory(AdhocQueryRequest request, String userId, String sql,
+                                   int status, long costMs, int rowCount, String error) {
+        try {
+            VisualAdhocHistory history = new VisualAdhocHistory();
+            history.setAdhocId(request.getAdhocId());
+            history.setUserId(userId);
+            history.setDatasourceId(request.getDatasourceId());
+            history.setSqlText(sql);
+            history.setStatus(status);
+            history.setCostMs(costMs);
+            history.setRowCount(rowCount);
+            history.setErrorMessage(error);
+            adhocHistoryMapper.insert(history);
+        } catch (Exception e) {
+            log.warn("记录即席查询历史失败: {}", e.getMessage());
+        }
     }
 
     /**
@@ -498,5 +652,200 @@ public class VisualService {
             throw new BusinessException(result == null ? "查询失败" : result.getMsg());
         }
         return result.getData();
+    }
+
+    // ==================== 即席查询收藏 ====================
+
+    /** 保存（新增/更新）即席查询 */
+    @Transactional(rollbackFor = Exception.class)
+    public void saveAdhoc(AdhocSaveRequest request) {
+        if (StrUtil.isBlank(request.getName())) {
+            throw new BusinessException("查询名称不能为空");
+        }
+        if (StrUtil.isBlank(request.getDatasourceId())) {
+            throw new BusinessException("数据源ID不能为空");
+        }
+        if (StrUtil.isBlank(request.getSql())) {
+            throw new BusinessException("SQL 不能为空");
+        }
+        VisualAdhocQuery entity = new VisualAdhocQuery();
+        entity.setName(request.getName());
+        entity.setDatasourceId(request.getDatasourceId());
+        entity.setSqlText(request.getSql());
+        entity.setFolder(request.getFolder());
+        try {
+            entity.setParamsJson(request.getParams() == null ? null : objectMapper.writeValueAsString(request.getParams()));
+        } catch (Exception e) {
+            throw new BusinessException("参数序列化失败: " + e.getMessage());
+        }
+        if (StrUtil.isBlank(request.getId())) {
+            entity.setCreateBy(MetadataHolder.getUserId());
+            adhocQueryMapper.insert(entity);
+        } else {
+            VisualAdhocQuery existing = adhocQueryMapper.selectById(request.getId());
+            if (existing == null) {
+                throw new BusinessException(ResultCode.NOT_FOUND, "收藏查询不存在: " + request.getId());
+            }
+            entity.setId(request.getId());
+            adhocQueryMapper.updateById(entity);
+        }
+    }
+
+    /** 收藏查询分页（按当前用户隔离） */
+    public PageResult<VisualAdhocQuery> adhocQueryPage(long current, long size, String keyword, String userId) {
+        ensureSeedTemplates(userId);
+        Page<VisualAdhocQuery> page = adhocQueryMapper.selectPage(new Page<>(current, size),
+                new LambdaQueryWrapper<VisualAdhocQuery>()
+                        .eq(StrUtil.isNotBlank(userId), VisualAdhocQuery::getCreateBy, userId)
+                        .like(StrUtil.isNotBlank(keyword), VisualAdhocQuery::getName, keyword)
+                        .orderByDesc(VisualAdhocQuery::getCreateTime));
+        return PageResult.of(page.getCurrent(), page.getSize(), page.getTotal(), page.getRecords());
+    }
+
+    /**
+     * 首次访问时为用户预置内置模板（种子模板），之后完全归属该用户、可增删改。
+     * 仅当该用户当前没有任何模板记录时才注入，避免重复。
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public void ensureSeedTemplates(String userId) {
+        if (StrUtil.isBlank(userId)) {
+            return;
+        }
+        Long count = adhocQueryMapper.selectCount(
+                new LambdaQueryWrapper<VisualAdhocQuery>().eq(VisualAdhocQuery::getCreateBy, userId));
+        if (count != null && count > 0) {
+            return;
+        }
+        for (SeedTemplate t : seedTemplates) {
+            VisualAdhocQuery entity = new VisualAdhocQuery();
+            entity.setName(t.name);
+            entity.setDatasourceId(t.datasourceId);
+            entity.setSqlText(t.sql);
+            entity.setFolder("内置模板");
+            entity.setCreateBy(userId);
+            adhocQueryMapper.insert(entity);
+        }
+    }
+
+    /** 内置种子模板（演示用，用户首次访问自动注入，可修改/删除） */
+    private static final class SeedTemplate {
+        final String name;
+        final String datasourceId;
+        final String sql;
+        SeedTemplate(String name, String datasourceId, String sql) {
+            this.name = name;
+            this.datasourceId = datasourceId;
+            this.sql = sql;
+        }
+    }
+
+    private static final List<SeedTemplate> seedTemplates = Arrays.asList(
+            new SeedTemplate("各省销售额 TOP10", null,
+                    "SELECT province, SUM(amount) AS 销售额, SUM(qty) AS 销量, ROUND(SUM(profit)/SUM(amount)*100,2) AS 利润率\n" +
+                    "FROM demo_fact_order\nGROUP BY province\nORDER BY 销售额 DESC\nLIMIT 10"),
+            new SeedTemplate("按月销售趋势", null,
+                    "SELECT DATE_FORMAT(order_date,'%Y-%m') AS 月份, SUM(amount) AS 销售额, SUM(profit) AS 利润\n" +
+                    "FROM demo_fact_order\nGROUP BY DATE_FORMAT(order_date,'%Y-%m')\nORDER BY 月份"),
+            new SeedTemplate("渠道×类目销售矩阵", null,
+                    "SELECT c.channel AS 渠道, ca.category AS 类目, SUM(o.amount) AS 销售额\n" +
+                    "FROM demo_fact_order o\nJOIN demo_dim_channel c ON o.channel_id = c.id\n" +
+                    "JOIN demo_dim_category ca ON o.category_id = ca.id\nGROUP BY c.channel, ca.category\nORDER BY 渠道, 销售额 DESC"),
+            new SeedTemplate("大区销售额占比", null,
+                    "SELECT r.region AS 大区, SUM(o.amount) AS 销售额, COUNT(*) AS 订单数\n" +
+                    "FROM demo_fact_order o\nJOIN demo_dim_region r ON o.region_id = r.id\nGROUP BY r.region\nORDER BY 销售额 DESC"),
+            new SeedTemplate("高利润类目 TOP8", null,
+                    "SELECT ca.category AS 类目, ROUND(AVG(o.profit),2) AS 平均利润, ROUND(AVG(o.profit)/AVG(o.amount)*100,2) AS 平均利润率\n" +
+                    "FROM demo_fact_order o\nJOIN demo_dim_category ca ON o.category_id = ca.id\n" +
+                    "GROUP BY ca.category\nORDER BY 平均利润 DESC\nLIMIT 8"),
+            new SeedTemplate("近30天逐日订单(城市)", null,
+                    "SELECT order_date AS 日期, city AS 城市, channel AS 渠道, category AS 类目, amount AS 金额, qty AS 数量, profit AS 利润\n" +
+                    "FROM demo_daily_order\nORDER BY order_date DESC\nLIMIT 100"),
+            new SeedTemplate("参数示例：指定月份销售额", null,
+                    "SELECT province AS 省份, SUM(amount) AS 销售额\n" +
+                    "FROM demo_fact_order\nWHERE DATE_FORMAT(order_date,'%Y-%m') = '${month}'\nGROUP BY province\nORDER BY 销售额 DESC"),
+            new SeedTemplate("订单明细(含维度)", null,
+                    "SELECT o.order_date AS 订单日期, o.province AS 省份, c.channel AS 渠道, ca.category AS 类目,\n" +
+                    "       o.amount AS 金额, o.qty AS 数量, o.profit AS 利润\n" +
+                    "FROM demo_fact_order o\nJOIN demo_dim_channel c ON o.channel_id = c.id\n" +
+                    "JOIN demo_dim_category ca ON o.category_id = ca.id\nORDER BY o.order_date DESC\nLIMIT 100"));
+
+    public VisualAdhocQuery getAdhocQuery(String id) {
+        VisualAdhocQuery query = adhocQueryMapper.selectById(id);
+        if (query == null) {
+            throw new BusinessException(ResultCode.NOT_FOUND, "收藏查询不存在: " + id);
+        }
+        return query;
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public void deleteAdhocQuery(String id) {
+        if (adhocQueryMapper.selectById(id) == null) {
+            throw new BusinessException(ResultCode.NOT_FOUND, "收藏查询不存在: " + id);
+        }
+        adhocQueryMapper.deleteById(id);
+    }
+
+    /** 收藏查询执行历史（分页） */
+    public PageResult<VisualAdhocHistory> adhocHistoryPage(long current, long size, String userId) {
+        Page<VisualAdhocHistory> page = adhocHistoryMapper.selectPage(new Page<>(current, size),
+                new LambdaQueryWrapper<VisualAdhocHistory>()
+                        .eq(StrUtil.isNotBlank(userId), VisualAdhocHistory::getUserId, userId)
+                        .orderByDesc(VisualAdhocHistory::getCreateTime));
+        return PageResult.of(page.getCurrent(), page.getSize(), page.getTotal(), page.getRecords());
+    }
+
+    /** 将即席查询存为仪表板组件，返回组件ID */
+    @Transactional(rollbackFor = Exception.class)
+    public String saveAdhocAsItem(SaveAsItemRequest request) {
+        if (StrUtil.isBlank(request.getDashboardId())) {
+            throw new BusinessException("目标仪表板ID不能为空");
+        }
+        getDashboard(request.getDashboardId());
+        if (StrUtil.isBlank(request.getTitle())) {
+            throw new BusinessException("组件标题不能为空");
+        }
+        VisualDashboardItem item = new VisualDashboardItem();
+        item.setDashboardId(request.getDashboardId());
+        item.setTitle(request.getTitle());
+        item.setChartType(StrUtil.isBlank(request.getChartType()) ? "TABLE" : request.getChartType());
+        item.setDatasourceId(request.getDatasourceId());
+        item.setQuerySql(request.getSql());
+        item.setConfig(request.getConfig());
+        item.setPosX(0);
+        item.setPosY(0);
+        item.setWidth(6);
+        item.setHeight(4);
+        itemMapper.insert(item);
+        return item.getId();
+    }
+
+    /** 查询结果转 CSV（含 UTF-8 BOM，避免 Excel 中文乱码） */
+    public String toCsv(QueryResult result) {
+        StringBuilder sb = new StringBuilder("﻿");
+        if (result.getColumns() != null) {
+            sb.append(result.getColumns().stream()
+                    .map(ColumnInfo::getColumnName)
+                    .map(this::csvEscape)
+                    .collect(java.util.stream.Collectors.joining(",")));
+            sb.append("\r\n");
+        }
+        if (result.getRows() != null) {
+            for (Map<String, Object> row : result.getRows()) {
+                sb.append(result.getColumns().stream()
+                        .map(c -> String.valueOf(row.get(c.getColumnName())))
+                        .map(this::csvEscape)
+                        .collect(java.util.stream.Collectors.joining(",")));
+                sb.append("\r\n");
+            }
+        }
+        return sb.toString();
+    }
+
+    private String csvEscape(String value) {
+        String v = value == null ? "" : value;
+        if (v.contains(",") || v.contains("\"") || v.contains("\n")) {
+            return "\"" + v.replace("\"", "\"\"") + "\"";
+        }
+        return v;
     }
 }

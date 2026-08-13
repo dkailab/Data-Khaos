@@ -14,7 +14,7 @@
 ## 架构与端口
 
 ```
-浏览器 / 前端 ──> 网关 :8080
+浏览器 / 前端 ──> 网关 :8099
                      │  路由 /api/auth  → auth      :8081
                      │        /api/permission → permission :8082
                      │        /api/approval → approval  :8083

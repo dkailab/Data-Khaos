@@ -565,6 +565,38 @@ CREATE INDEX idx_board_dashboard ON visual_board(dashboard_id);
 
 ALTER TABLE visual_dashboard_version ADD COLUMN boards_json LONGTEXT COMMENT '分析板快照(JSON数组)';
 
+-- 8.4 即席查询收藏表
+CREATE TABLE visual_adhoc_query (
+    id            VARCHAR(32) PRIMARY KEY,
+    name          VARCHAR(200) NOT NULL,
+    datasource_id VARCHAR(32),
+    sql_text      TEXT,                          -- 查询SQL（支持 ${param} 占位符）
+    params_json   TEXT,                          -- 默认参数（JSON）
+    folder        VARCHAR(100),                 -- 分组/文件夹
+    create_by     VARCHAR(32),
+    create_time   DATETIME DEFAULT CURRENT_TIMESTAMP(),
+    update_time   DATETIME DEFAULT CURRENT_TIMESTAMP()
+);
+COMMENT ON TABLE visual_adhoc_query IS '即席查询收藏表';
+CREATE INDEX idx_ahq_user ON visual_adhoc_query(create_by);
+
+-- 8.5 即席查询执行历史表
+CREATE TABLE visual_adhoc_history (
+    id            VARCHAR(32) PRIMARY KEY,
+    adhoc_id      VARCHAR(32),                  -- 关联收藏查询ID
+    user_id       VARCHAR(32),                  -- 执行用户ID
+    datasource_id VARCHAR(32),
+    sql_text      TEXT,                          -- 实际执行SQL
+    status        TINYINT DEFAULT 1,            -- 1:成功 0:失败
+    cost_ms       BIGINT DEFAULT 0,
+    row_count     INT DEFAULT 0,
+    error_message VARCHAR(1000),
+    create_time   DATETIME DEFAULT CURRENT_TIMESTAMP()
+);
+COMMENT ON TABLE visual_adhoc_history IS '即席查询执行历史表';
+CREATE INDEX idx_ahh_user ON visual_adhoc_history(user_id);
+CREATE INDEX idx_ahh_adhoc ON visual_adhoc_history(adhoc_id);
+
 -- ============================================================
 -- 9. 初始数据
 -- ============================================================
@@ -603,7 +635,8 @@ INSERT INTO sys_menu (id, parent_id, name, path, component, permission, type, so
 ('3', NULL, '查询分析', '/query', 'Layout', NULL, 0, 3),
 ('31', '3', 'SQL查询', '/query/sql', 'query/sql/index', 'query:sql:execute', 1, 1),
 ('32', '3', '仪表板', '/query/dashboard', 'query/dashboard/index', 'query:dashboard:view', 1, 2),
-('33', '3', '分析板', '/query/analysis', 'query/analysis/index', 'query:analysis:view', 1, 3);
+('33', '3', '分析板', '/query/analysis', 'query/analysis/index', 'query:analysis:view', 1, 3),
+('34', '3', '即席分析', '/visual/adhoc', 'visual/adhoc/index', 'visual:adhoc:execute', 'Magic', 1, 4);
 
 -- 7.7 默认菜单 - 调度与通知
 INSERT INTO sys_menu (id, parent_id, name, path, component, permission, type, sort_order) VALUES

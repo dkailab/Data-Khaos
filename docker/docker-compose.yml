@@ -114,7 +114,7 @@ services:
         MODULE: data-khaos-gateway
     container_name: dk-gateway
     ports:
-      - "8080:8080"
+      - "8099:8080"   # 主机 8099 -> 容器内 8080；让出 8080 供其他服务使用
 
   # ---------- 认证中心 ----------
   auth:

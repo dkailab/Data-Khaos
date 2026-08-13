@@ -79,7 +79,7 @@ cd docker && docker compose up -d --build
 # 2. 冒烟测试
 ./scripts/smoke-test.sh
 
-# 3. 启动前端（开发模式，代理到网关 8080）
+# 3. 启动前端（开发模式，代理到网关 8099）
 cd ../data-khaos-web && npm install && npm run dev
 ```
 
