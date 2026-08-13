@@ -376,6 +376,75 @@ CREATE TABLE IF NOT EXISTS mart_model_rel (
 ) ENGINE=InnoDB COMMENT='模型关联关系表';
 
 -- ============================================================
+-- 4.5 数据质量稽核表
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS dquality_rule (
+    id               VARCHAR(32) NOT NULL PRIMARY KEY COMMENT '主键ID',
+    project_group_id VARCHAR(32) COMMENT '项目组ID（权限隔离，空=全局模板）',
+    rule_code        VARCHAR(64) COMMENT '规则编码',
+    rule_name        VARCHAR(128) NOT NULL COMMENT '规则名称',
+    rule_type        VARCHAR(32) NOT NULL COMMENT '规则类型 NOT_NULL/UNIQUE/VALUE_RANGE/CUSTOM_SQL/CUSTOM_PROBE',
+    datasource_id    VARCHAR(32) COMMENT '数据源ID',
+    database_name    VARCHAR(128) COMMENT '库',
+    table_name       VARCHAR(128) COMMENT '表',
+    column_name      VARCHAR(128) COMMENT '字段（表级规则可空）',
+    rule_config      TEXT COMMENT '规则配置 JSON（阈值/表达式/自定义SQL）',
+    weight           INT DEFAULT 1 COMMENT '权重（评分用）',
+    alert_threshold  DECIMAL(5,2) DEFAULT 0 COMMENT '告警阈值（如空值率 0.05）',
+    status           TINYINT DEFAULT 1 COMMENT '0停用 1启用',
+    create_by        VARCHAR(32) COMMENT '创建人',
+    create_time      DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    KEY idx_dqr_group (project_group_id),
+    KEY idx_dqr_table (datasource_id, database_name, table_name)
+) ENGINE=InnoDB COMMENT='数据质量-质量规则表';
+
+CREATE TABLE IF NOT EXISTS dquality_task (
+    id               VARCHAR(32) NOT NULL PRIMARY KEY COMMENT '主键ID',
+    project_group_id VARCHAR(32) COMMENT '项目组隔离',
+    task_name        VARCHAR(128) NOT NULL COMMENT '任务名称',
+    rule_ids         TEXT COMMENT '关联规则ID集合（JSON数组）',
+    cron_expr        VARCHAR(64) COMMENT '周期表达式（空=一次性/手动）',
+    status           TINYINT DEFAULT 1 COMMENT '0停用 1启用',
+    create_by        VARCHAR(32) COMMENT '创建人',
+    create_time      DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    KEY idx_dqt_group (project_group_id)
+) ENGINE=InnoDB COMMENT='数据质量-质量任务表';
+
+CREATE TABLE IF NOT EXISTS dquality_snapshot (
+    id               VARCHAR(32) NOT NULL PRIMARY KEY COMMENT '主键ID',
+    project_group_id VARCHAR(32) COMMENT '项目组隔离',
+    task_id          VARCHAR(32) COMMENT '关联任务',
+    datasource_id    VARCHAR(32) COMMENT '数据源ID',
+    database_name    VARCHAR(128) COMMENT '库',
+    table_name       VARCHAR(128) COMMENT '表',
+    score            DECIMAL(5,2) COMMENT '质量评分 0-100',
+    rule_total       INT DEFAULT 0 COMMENT '规则总数',
+    rule_pass        INT DEFAULT 0 COMMENT '通过数',
+    rule_fail        INT DEFAULT 0 COMMENT '失败数',
+    detail           TEXT COMMENT '明细 JSON（各规则结果）',
+    cost_ms          BIGINT DEFAULT 0 COMMENT '耗时(ms)',
+    trigger_type     VARCHAR(16) DEFAULT 'MANUAL' COMMENT 'MANUAL/SCHEDULE',
+    create_by        VARCHAR(32) COMMENT '创建人',
+    create_time      DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    KEY idx_dqs_group (project_group_id),
+    KEY idx_dqs_task (task_id),
+    KEY idx_dqs_table (datasource_id, database_name, table_name)
+) ENGINE=InnoDB COMMENT='数据质量-稽核快照表（每次执行）';
+
+CREATE TABLE IF NOT EXISTS dquality_rule_result (
+    id           VARCHAR(32) NOT NULL PRIMARY KEY COMMENT '主键ID',
+    snapshot_id  VARCHAR(32) NOT NULL COMMENT '关联快照',
+    rule_id      VARCHAR(32) COMMENT '规则ID',
+    passed       TINYINT DEFAULT 0 COMMENT '0失败 1通过',
+    actual_value DECIMAL(20,4) COMMENT '实际值（如空值率）',
+    threshold    DECIMAL(5,2) COMMENT '阈值',
+    sample_rows  TEXT COMMENT '违规样本（前 N 行 JSON）',
+    message      VARCHAR(500) COMMENT '结果说明',
+    KEY idx_dqrr_snapshot (snapshot_id)
+) ENGINE=InnoDB COMMENT='数据质量-规则执行结果表';
+
+-- ============================================================
 -- 5. 调度表
 -- ============================================================
 

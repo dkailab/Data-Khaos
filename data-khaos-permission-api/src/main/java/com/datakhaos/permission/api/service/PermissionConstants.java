@@ -28,6 +28,11 @@ public interface PermissionConstants {
     String CAP_MODEL_DEVELOP = "model:develop";
     String CAP_MODEL_PUBLISH = "model:publish";
 
+    /** 数据质量能力位（数据治理能力域） */
+    String CAP_QUALITY_MANAGE = "quality:manage";
+    String CAP_QUALITY_BROWSE = "quality:browse";
+    String CAP_QUALITY_RUN = "quality:run";
+
     String PERM_SQL_EXECUTE = "query:sql:execute";
     String PERM_DASHBOARD_VIEW = "query:dashboard:view";
     String PERM_ANALYSIS_VIEW = "query:analysis:view";

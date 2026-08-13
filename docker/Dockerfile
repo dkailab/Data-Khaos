@@ -22,6 +22,7 @@ COPY data-khaos-auth-api/     ./data-khaos-auth-api/
 COPY data-khaos-permission-api/ ./data-khaos-permission-api/
 COPY data-khaos-datasource-api/ ./data-khaos-datasource-api/
 COPY data-khaos-mart-api/     ./data-khaos-mart-api/
+COPY data-khaos-dquality-api/ ./data-khaos-dquality-api/
 COPY data-khaos-gateway/      ./data-khaos-gateway/
 COPY data-khaos-auth/         ./data-khaos-auth/
 COPY data-khaos-permission/   ./data-khaos-permission/
@@ -33,6 +34,7 @@ COPY data-khaos-query/        ./data-khaos-query/
 COPY data-khaos-visual/       ./data-khaos-visual/
 COPY data-khaos-schedule/     ./data-khaos-schedule/
 COPY data-khaos-notification/ ./data-khaos-notification/
+COPY data-khaos-dquality/     ./data-khaos-dquality/
 
 RUN mvn -q -B -DskipTests clean package
 

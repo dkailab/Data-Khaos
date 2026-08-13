@@ -145,7 +145,11 @@ async function loadCaptcha() {
 }
 
 async function handleLogin() {
-  await formRef.value?.validate()
+  try {
+    await formRef.value?.validate()
+  } catch {
+    return
+  }
   loading.value = true
   try {
     const payload: LoginRequest = {
@@ -164,6 +168,10 @@ async function handleLogin() {
     }
     ElMessage.success('登录成功')
     router.push((route.query.redirect as string) || '/dashboard')
+  } catch {
+    // 验证码一次有效：校验失败即失效，失败后自动刷新并清空输入
+    form.captchaCode = ''
+    loadCaptcha()
   } finally {
     loading.value = false
   }

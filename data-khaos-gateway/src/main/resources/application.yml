@@ -61,6 +61,10 @@ spring:
           uri: lb://data-khaos-notification
           predicates:
             - Path=/api/notify/**
+        - id: data-khaos-dquality
+          uri: lb://data-khaos-dquality
+          predicates:
+            - Path=/api/dquality/**
       globalcors:
         cors-configurations:
           '[/**]':

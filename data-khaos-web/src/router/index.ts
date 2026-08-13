@@ -161,6 +161,25 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/visual/adhoc/AdhocWorkbench.vue'),
         meta: { title: '即席分析' },
       },
+      // 数据质量
+      {
+        path: 'dquality/rule',
+        name: 'DqRule',
+        component: () => import('@/views/dquality/rule/RuleList.vue'),
+        meta: { title: '质量规则' },
+      },
+      {
+        path: 'dquality/task',
+        name: 'DqTask',
+        component: () => import('@/views/dquality/task/TaskList.vue'),
+        meta: { title: '质量任务' },
+      },
+      {
+        path: 'dquality/snapshot',
+        name: 'DqSnapshot',
+        component: () => import('@/views/dquality/snapshot/SnapshotList.vue'),
+        meta: { title: '稽核报告' },
+      },
       // 调度中心
       {
         path: 'schedule/job',

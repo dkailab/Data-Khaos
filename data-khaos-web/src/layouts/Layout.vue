@@ -150,6 +150,15 @@ const menus: MenuItem[] = [
     children: [{ title: '仪表板管理', path: '/visual/dashboard' }],
   },
   {
+    title: '数据质量',
+    icon: 'Odometer',
+    children: [
+      { title: '质量规则', path: '/dquality/rule' },
+      { title: '质量任务', path: '/dquality/task' },
+      { title: '稽核报告', path: '/dquality/snapshot' },
+    ],
+  },
+  {
     title: '调度中心',
     icon: 'AlarmClock',
     children: [{ title: '调度任务', path: '/schedule/job' }],

@@ -440,6 +440,75 @@ export interface MartModelRel {
   joinType?: string
 }
 
+/* ==================== 数据质量 ==================== */
+
+export interface DqRule {
+  id?: string
+  /** 项目组ID（权限隔离） */
+  projectGroupId?: string
+  ruleCode?: string
+  ruleName?: string
+  /** NOT_NULL / UNIQUE / VALUE_RANGE / CUSTOM_SQL / CUSTOM_PROBE */
+  ruleType?: string
+  datasourceId?: string
+  databaseName?: string
+  tableName?: string
+  columnName?: string
+  /** 规则配置 JSON */
+  ruleConfig?: string
+  weight?: number
+  alertThreshold?: number
+  /** 0停用 1启用 */
+  status?: number
+  createBy?: string
+  createTime?: string
+}
+
+export interface DqTask {
+  id?: string
+  projectGroupId?: string
+  taskName?: string
+  /** 关联规则ID集合（JSON数组） */
+  ruleIds?: string
+  cronExpr?: string
+  status?: number
+  createBy?: string
+  createTime?: string
+}
+
+export interface DqSnapshot {
+  id?: string
+  projectGroupId?: string
+  taskId?: string
+  taskName?: string
+  datasourceId?: string
+  databaseName?: string
+  tableName?: string
+  score?: number
+  ruleTotal?: number
+  rulePass?: number
+  ruleFail?: number
+  detail?: string
+  costMs?: number
+  /** MANUAL / SCHEDULE */
+  triggerType?: string
+  createBy?: string
+  createTime?: string
+}
+
+export interface DqRuleResult {
+  id?: string
+  snapshotId?: string
+  ruleId?: string
+  ruleName?: string
+  ruleType?: string
+  passed?: number
+  actualValue?: number
+  threshold?: number
+  sampleRows?: string
+  message?: string
+}
+
 /* ==================== SQL 查询 ==================== */
 
 export interface QueryExecuteRequest {

@@ -29,11 +29,11 @@ ON DUPLICATE KEY UPDATE project_name = VALUES(project_name);
 -- 4) 项目组角色：三档全局模板（project_group_id 为空）+ 组内自定义示例
 INSERT INTO sg_project_role (id, org_id, project_group_id, role_name, role_code, capability_flags, status, sort_order) VALUES
 -- 全局模板
-('pg_role_leader',   '11', NULL, '组长',   'PG_LEADER',   '["meta:browse","query:execute","table:manage","model:develop","model:publish","model:browse","report:develop","report:publish","report:browse","task:develop","task:schedule","approval:apply","approval:approve","pg:manage"]', 1, 1),
-('pg_role_dev',      '11', NULL, '开发者', 'PG_DEV',      '["meta:browse","query:execute","model:develop","model:browse","report:develop","report:browse","task:develop","approval:apply"]', 1, 2),
-('pg_role_user',     '11', NULL, '使用者', 'PG_USER',     '["meta:browse","model:browse","report:browse","approval:apply"]', 1, 3),
+('pg_role_leader',   '11', NULL, '组长',   'PG_LEADER',   '["meta:browse","query:execute","table:manage","model:develop","model:publish","model:browse","report:develop","report:publish","report:browse","task:develop","task:schedule","approval:apply","approval:approve","pg:manage","quality:manage","quality:browse","quality:run"]', 1, 1),
+('pg_role_dev',      '11', NULL, '开发者', 'PG_DEV',      '["meta:browse","query:execute","model:develop","model:browse","report:develop","report:browse","task:develop","approval:apply","quality:manage","quality:browse","quality:run"]', 1, 2),
+('pg_role_user',     '11', NULL, '使用者', 'PG_USER',     '["meta:browse","model:browse","report:browse","approval:apply","quality:browse"]', 1, 3),
 -- 零售组自定义：开发者扩展了表管理权限
-('pg_role_retail_dev', '11', 'pg_001', '零售-高级开发者', 'PG_RETAIL_DEV', '["meta:browse","query:execute","table:manage","model:develop","model:browse","report:develop","report:browse","task:develop","approval:apply"]', 1, 1)
+('pg_role_retail_dev', '11', 'pg_001', '零售-高级开发者', 'PG_RETAIL_DEV', '["meta:browse","query:execute","table:manage","model:develop","model:browse","report:develop","report:browse","task:develop","approval:apply","quality:manage","quality:browse","quality:run"]', 1, 1)
 ON DUPLICATE KEY UPDATE role_name = VALUES(role_name);
 
 -- 5) 项目组成员（含组内角色 + 主组标记，用于当前项目组上下文）

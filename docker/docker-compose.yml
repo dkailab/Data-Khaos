@@ -236,6 +236,18 @@ services:
     ports:
       - "8090:8090"
 
+  # ---------- 数据质量 ----------
+  dquality:
+    <<: *app-common
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      args:
+        MODULE: data-khaos-dquality
+    container_name: dk-dquality
+    ports:
+      - "8091:8091"
+
 volumes:
   mysql-data:
   redis-data:
