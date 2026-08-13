@@ -20,6 +20,23 @@
           {{ ruleCount(row.ruleIds) }} 条
         </template>
       </el-table-column>
+      <el-table-column label="关联调度任务" min-width="220">
+        <template #default="{ row }">
+          <template v-if="(scheduleMap[row.id] || []).length">
+            <el-tag
+              v-for="job in scheduleMap[row.id]"
+              :key="job.jobId"
+              class="job-tag"
+              :type="job.status === 1 ? 'success' : 'info'"
+              effect="plain"
+              @click="goSchedule(job)"
+            >
+              {{ job.jobName }}<span v-if="job.cronExpression" class="job-cron">{{ job.cronExpression }}</span>
+            </el-tag>
+          </template>
+          <span v-else class="muted">—</span>
+        </template>
+      </el-table-column>
       <el-table-column prop="cronExpr" label="周期表达式" min-width="140">
         <template #default="{ row }">
           <span v-if="row.cronExpr">{{ row.cronExpr }}</span>
@@ -87,16 +104,21 @@ import { onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 import { Plus, Refresh, Search } from '@element-plus/icons-vue'
-import { createTask, deleteTask, enableTask, pageTasks, runTask, updateTask } from '@/api/dquality'
+import { useRouter } from 'vue-router'
+import { createTask, deleteTask, enableTask, pageTasks, runTask, taskScheduleMap, updateTask } from '@/api/dquality'
 import { pageRules } from '@/api/dquality'
-import type { DqRule, DqTask } from '@/types'
+import type { DqRule, DqTask, ScheduleJobBrief } from '@/types'
 
+const router = useRouter()
 const loading = ref(false)
 const submitting = ref(false)
 const runningId = ref('')
 const list = ref<DqTask[]>([])
 const total = ref(0)
 const query = reactive<Record<string, any>>({ current: 1, size: 10, keyword: '' })
+
+/** 质量任务ID -> 关联的调度任务列表 */
+const scheduleMap = ref<Record<string, ScheduleJobBrief[]>>({})
 
 const ruleOptions = ref<DqRule[]>([])
 
@@ -121,12 +143,21 @@ function ruleCount(ruleIds?: string) {
 async function load() {
   loading.value = true
   try {
-    const data = await pageTasks({ ...query })
-    list.value = data.records
-    total.value = Number(data.total)
+    const [pageData, scheduleData] = await Promise.all([
+      pageTasks({ ...query }),
+      taskScheduleMap(),
+    ])
+    list.value = pageData.records
+    total.value = Number(pageData.total)
+    scheduleMap.value = scheduleData || {}
   } finally {
     loading.value = false
   }
+}
+
+/** 跳转到调度中心（可按任务ID定位） */
+function goSchedule(job: ScheduleJobBrief) {
+  router.push({ path: '/schedule/job', query: job.jobId ? { keyword: job.jobName } : {} })
 }
 
 function handleSearch() {
@@ -220,5 +251,17 @@ onMounted(() => {
 .pager {
   margin-top: 16px;
   justify-content: flex-end;
+}
+.job-tag {
+  margin-right: 6px;
+  cursor: pointer;
+}
+.job-tag .job-cron {
+  margin-left: 4px;
+  color: #909399;
+  font-family: monospace;
+}
+.muted {
+  color: #c0c4cc;
 }
 </style>

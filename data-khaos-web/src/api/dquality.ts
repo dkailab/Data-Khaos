@@ -1,5 +1,5 @@
 import { del, get, post, put } from './request'
-import type { DqRule, DqSnapshot, DqTask, PageResult } from '@/types'
+import type { DqRule, DqSnapshot, DqTask, PageResult, ScheduleJobBrief } from '@/types'
 
 /* ==================== 规则 ==================== */
 
@@ -31,6 +31,11 @@ export function ruleTemplateOptions() {
 
 export function pageTasks(params: Record<string, any>) {
   return get<PageResult<DqTask>>('/dquality/task/page', params)
+}
+
+/** 质量任务关联的调度任务映射（taskId -> 调度任务列表） */
+export function taskScheduleMap() {
+  return get<Record<string, ScheduleJobBrief[]>>('/dquality/task/schedule-map')
 }
 
 export function createTask(data: DqTask) {

@@ -10,6 +10,8 @@ import com.datakhaos.common.security.MetadataHolder;
 import com.datakhaos.dquality.entity.DqRule;
 import com.datakhaos.dquality.entity.DqRuleResult;
 import com.datakhaos.dquality.entity.DqSnapshot;
+import com.datakhaos.dquality.client.ScheduleApiClient;
+import com.datakhaos.dquality.dto.ScheduleJobBrief;
 import com.datakhaos.dquality.entity.DqTask;
 import com.datakhaos.dquality.mapper.DqRuleMapper;
 import com.datakhaos.dquality.mapper.DqRuleResultMapper;
@@ -24,7 +26,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 质量任务服务：CRUD + 手动执行（调用稽核引擎生成快照）。
@@ -41,6 +45,7 @@ public class TaskService {
     private final QualityEngine engine;
     private final DqAuthContext auth;
     private final com.datakhaos.dquality.client.NotificationApiClient notificationClient;
+    private final ScheduleApiClient scheduleClient;
 
     public PageResult<DqTask> page(long current, long size, String keyword, Integer status) {
         AuthContext ctx = auth.current();
@@ -110,6 +115,22 @@ public class TaskService {
         upd.setId(id);
         upd.setStatus(enabled ? 1 : 0);
         taskMapper.updateById(upd);
+    }
+
+    /**
+     * 质量任务 <-> 调度任务关联映射。
+     * 拉取调度服务全部 QUALITY 任务，解析 params.taskId 建立映射，
+     * 供质量任务列表展示「关联调度任务」。
+     */
+    public Map<String, List<ScheduleJobBrief>> scheduleMap() {
+        Map<String, List<ScheduleJobBrief>> map = new HashMap<>();
+        for (ScheduleJobBrief job : scheduleClient.listQualityJobs()) {
+            if (StrUtil.isBlank(job.getTaskId())) {
+                continue;
+            }
+            map.computeIfAbsent(job.getTaskId(), k -> new ArrayList<>()).add(job);
+        }
+        return map;
     }
 
     /**

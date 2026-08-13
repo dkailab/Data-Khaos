@@ -691,6 +691,18 @@ export interface ScheduleJob {
   updateTime?: string
 }
 
+/** 调度任务简要信息（供质量任务页面展示关联关系） */
+export interface ScheduleJobBrief {
+  jobId?: string
+  jobName?: string
+  jobType?: string
+  cronExpression?: string
+  /** 0:停用 1:启用 */
+  status?: number
+  /** 关联的质量任务ID */
+  taskId?: string
+}
+
 export interface ScheduleJobLog {
   id?: string
   jobId?: string

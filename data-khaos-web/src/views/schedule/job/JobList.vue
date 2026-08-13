@@ -158,8 +158,11 @@ import { onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 import { Plus, Refresh, Search } from '@element-plus/icons-vue'
+import { useRoute } from 'vue-router'
 import { createJob, deleteJob, pageJobLogs, pageJobs, runJob, startJob, stopJob, updateJob } from '@/api/schedule'
 import type { ScheduleJob, ScheduleJobLog } from '@/types'
+
+const route = useRoute()
 
 const jobTypes = [
   { label: '同步 SYNC', value: 'SYNC' },
@@ -293,7 +296,15 @@ async function loadLogs() {
   }
 }
 
-onMounted(load)
+onMounted(() => {
+  // 支持从质量任务页面跳转定位：携带 keyword 时自动按关键字过滤 QUALITY 任务
+  const kw = route.query.keyword
+  if (typeof kw === 'string' && kw) {
+    query.keyword = kw
+    query.jobType = 'QUALITY'
+  }
+  load()
+})
 </script>
 
 <style scoped>
