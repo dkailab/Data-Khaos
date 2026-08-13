@@ -476,7 +476,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
@@ -605,7 +605,6 @@ async function refreshBoard(board: VisualBoard) {
   for (const it of boardItems(board.id)) {
     await refreshItem(it)
   }
-  ElMessage.success(`「${board.boardName}」已刷新`)
 }
 
 function startBoardAutoRefresh(board: VisualBoard) {
@@ -1156,6 +1155,11 @@ onMounted(() => {
   }
   loadDatasources()
   loadAll()
+})
+
+onUnmounted(() => {
+  // 离开页面必须清理各分析板自动刷新定时器，避免后台持续拉取接口
+  clearAllTimers()
 })
 </script>
 

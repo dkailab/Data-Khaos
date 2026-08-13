@@ -5,6 +5,8 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.datakhaos.common.model.PageResult;
 import com.datakhaos.permission.entity.SysTablePermission;
 import com.datakhaos.permission.entity.SysUserRole;
+import com.datakhaos.permission.entity.SgProjectGroupMember;
+import com.datakhaos.permission.mapper.SgProjectGroupMemberMapper;
 import com.datakhaos.permission.mapper.SysRoleMapper;
 import com.datakhaos.permission.mapper.SysTablePermissionMapper;
 import com.datakhaos.permission.mapper.SysUserRoleMapper;
@@ -16,7 +18,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 表级权限管理：SELECT/INSERT/UPDATE/DELETE 控制
+ * 表级权限管理：SELECT/INSERT/UPDATE/DELETE 控制。
+ * 授权主体：个人(user_id) + 角色(role_id) + 项目组(project_group_id)，三者将取并集。
  */
 @Service
 @RequiredArgsConstructor
@@ -25,6 +28,7 @@ public class TablePermissionService {
     private final SysTablePermissionMapper tablePermissionMapper;
     private final SysUserRoleMapper userRoleMapper;
     private final SysRoleMapper roleMapper;
+    private final SgProjectGroupMemberMapper projectGroupMemberMapper;
 
     public PageResult<SysTablePermission> page(long current, long size, String tableName) {
         LambdaQueryWrapper<SysTablePermission> wrapper = new LambdaQueryWrapper<SysTablePermission>()
@@ -67,9 +71,11 @@ public class TablePermissionService {
                 : tablePermissionMapper.selectList(new LambdaQueryWrapper<SysTablePermission>()
                 .in(SysTablePermission::getRoleId, roleIds)
                 .eq(SysTablePermission::getStatus, 1));
+        // 项目组的授权（成员自动继承）
+        List<SysTablePermission> groupPerms = projectGroupPerms(userId);
 
         List<Map<String, Object>> result = new ArrayList<>();
-        for (SysTablePermission p : concat(userPerms, rolePerms)) {
+        for (SysTablePermission p : concat(userPerms, concat(rolePerms, groupPerms))) {
             result.add(Map.of(
                     "datasourceId", p.getDatasourceId() == null ? "" : p.getDatasourceId(),
                     "databaseName", p.getDatabaseName() == null ? "" : p.getDatabaseName(),
@@ -96,6 +102,8 @@ public class TablePermissionService {
                     .in(SysTablePermission::getRoleId, roleIds)
                     .eq(SysTablePermission::getStatus, 1)));
         }
+        // 项目组授权（成员自动继承）
+        list.addAll(projectGroupPerms(userId));
         if (list.isEmpty()) {
             return true; // 未配置策略，默认放行
         }
@@ -118,5 +126,18 @@ public class TablePermissionService {
         List<SysTablePermission> list = new ArrayList<>(a);
         list.addAll(b);
         return list;
+    }
+
+    /** 查询用户所属项目组被授予的表权限（个人加入的项目组，成员自动继承） */
+    private List<SysTablePermission> projectGroupPerms(String userId) {
+        List<String> groupIds = projectGroupMemberMapper.selectList(new LambdaQueryWrapper<SgProjectGroupMember>()
+                        .eq(SgProjectGroupMember::getUserId, userId))
+                .stream().map(SgProjectGroupMember::getProjectGroupId).distinct().toList();
+        if (groupIds.isEmpty()) {
+            return List.of();
+        }
+        return tablePermissionMapper.selectList(new LambdaQueryWrapper<SysTablePermission>()
+                .in(SysTablePermission::getProjectGroupId, groupIds)
+                .eq(SysTablePermission::getStatus, 1));
     }
 }

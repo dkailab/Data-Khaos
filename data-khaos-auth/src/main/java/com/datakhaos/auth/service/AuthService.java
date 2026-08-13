@@ -38,9 +38,8 @@ public class AuthService {
      * 登录：校验 → 签发 JWT → 组装用户/角色/权限
      */
     public LoginResponse login(LoginRequest request) {
-        if (captchaService.enabled()) {
-            captchaService.validate(request.getCaptchaId(), request.getCaptchaCode());
-        }
+        // 验证码为登录必填，不可关闭
+        captchaService.validate(request.getCaptchaId(), request.getCaptchaCode());
         SysUser user = userMapper.selectOne(new LambdaQueryWrapper<SysUser>()
                 .eq(SysUser::getUsername, request.getUsername()));
         if (user == null || !PasswordUtil.matches(request.getPassword(), user.getPassword())) {

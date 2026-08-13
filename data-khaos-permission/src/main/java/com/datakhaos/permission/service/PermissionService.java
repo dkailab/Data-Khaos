@@ -35,6 +35,7 @@ public class PermissionService {
     private final SysMenuMapper menuMapper;
     private final com.datakhaos.permission.mapper.SysUserOrgMapper userOrgMapper;
     private final com.datakhaos.permission.mapper.SysOrgPermissionMapper orgPermissionMapper;
+    private final ProjectGroupService projectGroupService;
 
     /**
      * 计算用户权限视图（角色 / 权限标识 / 可见菜单）
@@ -56,8 +57,27 @@ public class PermissionService {
                 : mergeRoleAndOrgMenus(roleIds, userId);
 
         dto.setMenus(menus.stream().map(this::toDto).toList());
-        dto.setPermissions(menus.stream().map(SysMenu::getPermission)
+        List<String> perms = new java.util.ArrayList<>(menus.stream().map(SysMenu::getPermission)
                 .filter(StrUtil::isNotBlank).distinct().toList());
+
+        // 项目组权限：用户加入的项目组 + 当前项目组上下文 + 能力位合并
+        List<com.datakhaos.permission.api.model.ProjectGroupDto> groups = projectGroupService.getUserProjectGroups(userId);
+        dto.setProjectGroups(groups);
+        if (!groups.isEmpty()) {
+            com.datakhaos.permission.api.model.ProjectGroupDto current = groups.stream()
+                    .filter(com.datakhaos.permission.api.model.ProjectGroupDto::getPrimary).findFirst()
+                    .orElse(groups.get(0));
+            dto.setProjectGroupId(current.getId());
+            List<String> capabilityFlags = projectGroupService.getCapabilityFlags(userId, current.getId());
+            dto.setCapabilityFlags(capabilityFlags);
+            // 能力位并入权限标识集合，供前端显隐菜单/按钮
+            for (String flag : capabilityFlags) {
+                if (!perms.contains(flag)) {
+                    perms.add(flag);
+                }
+            }
+        }
+        dto.setPermissions(perms);
         return dto;
     }
 

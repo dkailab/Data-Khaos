@@ -26,7 +26,10 @@ public class SysTablePermission extends BaseEntity {
 
     private String userId;
 
-    /** ROLE / USER */
+    /** 项目组ID（按组授权，成员自动继承） */
+    private String projectGroupId;
+
+    /** ROLE / USER / PROJECT_GROUP */
     private String grantType;
 
     private Integer status;

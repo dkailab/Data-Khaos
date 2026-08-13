@@ -36,7 +36,7 @@ x-app-common: &app-common
     JWT_SECRET: ${JWT_SECRET:-data-khaos-jwt-secret-key-2026-hs256-0123456789}
     JWT_EXPIRE_SECONDS: ${JWT_EXPIRE_SECONDS:-7200}
     AES_KEY: ${AES_KEY:-data-khaos-aes-2026}
-    CAPTCHA_ENABLED: ${CAPTCHA_ENABLED:-false}
+    CAPTCHA_ENABLED: ${CAPTCHA_ENABLED:-true}
   depends_on:
     mysql:
       condition: service_healthy

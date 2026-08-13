@@ -29,5 +29,8 @@ public class SysColumnPolicy extends BaseEntity {
 
     private String userId;
 
+    /** 项目组ID（支持按组绑定） */
+    private String projectGroupId;
+
     private Integer status;
 }

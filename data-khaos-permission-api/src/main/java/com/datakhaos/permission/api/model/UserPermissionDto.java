@@ -24,4 +24,13 @@ public class UserPermissionDto implements Serializable {
 
     /** 可见菜单（扁平列表，前端构建树） */
     private List<MenuDto> menus = new ArrayList<>();
+
+    /** 用户加入的项目组集合 */
+    private List<ProjectGroupDto> projectGroups = new ArrayList<>();
+
+    /** 当前项目组ID（上下文，主项目组或用户切换后的选中组） */
+    private String projectGroupId;
+
+    /** 当前项目组角色合并后的能力位集合（操作权限，与菜单 permission 一起决定能做什么） */
+    private List<String> capabilityFlags = new ArrayList<>();
 }

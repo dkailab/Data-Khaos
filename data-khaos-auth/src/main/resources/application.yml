@@ -30,7 +30,7 @@ data-khaos:
     secret: ${JWT_SECRET:data-khaos-jwt-secret-key-2026-hs256-0123456789}
     expire-seconds: ${JWT_EXPIRE_SECONDS:7200}
   captcha:
-    enabled: ${CAPTCHA_ENABLED:false}
+    enabled: ${CAPTCHA_ENABLED:true}
   aes-key: ${AES_KEY:data-khaos-aes-2026}
 
 knife4j:

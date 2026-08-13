@@ -102,6 +102,7 @@ CREATE TABLE IF NOT EXISTS sys_row_policy (
     expression_desc VARCHAR(500) COMMENT '表达式描述',
     role_id         VARCHAR(32) COMMENT '角色ID',
     user_id         VARCHAR(32) COMMENT '用户ID',
+    project_group_id VARCHAR(32) COMMENT '项目组ID（支持按组绑定）',
     status          TINYINT DEFAULT 1 COMMENT '状态',
     create_time     DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间'
 ) ENGINE=InnoDB COMMENT='行权限策略表';
@@ -115,22 +116,75 @@ CREATE TABLE IF NOT EXISTS sys_column_policy (
     mask_rule     VARCHAR(200) COMMENT '脱敏规则(如 left:3,right:4)',
     role_id       VARCHAR(32) COMMENT '角色ID',
     user_id       VARCHAR(32) COMMENT '用户ID',
+    project_group_id VARCHAR(32) COMMENT '项目组ID（支持按组绑定）',
     status        TINYINT DEFAULT 1 COMMENT '状态',
     create_time   DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间'
 ) ENGINE=InnoDB COMMENT='列权限策略表';
 
 CREATE TABLE IF NOT EXISTS sys_table_permission (
-    id              VARCHAR(32) NOT NULL PRIMARY KEY COMMENT '主键ID',
-    datasource_id   VARCHAR(32) COMMENT '数据源ID',
-    database_name   VARCHAR(200) COMMENT '数据库',
-    table_name      VARCHAR(200) COMMENT '表名',
-    permission_type VARCHAR(50) NOT NULL COMMENT '权限类型 SELECT/INSERT/UPDATE/DELETE/ALL',
-    role_id         VARCHAR(32) COMMENT '角色ID',
-    user_id         VARCHAR(32) COMMENT '用户ID',
-    grant_type      VARCHAR(50) DEFAULT 'ROLE' COMMENT '授予类型 ROLE/USER',
-    status          TINYINT DEFAULT 1 COMMENT '状态',
-    create_time     DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间'
+    id               VARCHAR(32) NOT NULL PRIMARY KEY COMMENT '主键ID',
+    datasource_id    VARCHAR(32) COMMENT '数据源ID',
+    database_name    VARCHAR(200) COMMENT '数据库',
+    table_name       VARCHAR(200) COMMENT '表名',
+    permission_type  VARCHAR(50) NOT NULL COMMENT '权限类型 SELECT/INSERT/UPDATE/DELETE/ALL',
+    role_id          VARCHAR(32) COMMENT '角色ID',
+    user_id          VARCHAR(32) COMMENT '用户ID',
+    project_group_id VARCHAR(32) COMMENT '项目组ID（按组授权，成员自动继承）',
+    grant_type       VARCHAR(50) DEFAULT 'ROLE' COMMENT '授予类型 ROLE/USER/PROJECT_GROUP',
+    status           TINYINT DEFAULT 1 COMMENT '状态',
+    create_time      DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    KEY idx_tp_project_group (project_group_id)
 ) ENGINE=InnoDB COMMENT='表权限表';
+
+-- 项目组（组织下的业务协作单元）
+CREATE TABLE IF NOT EXISTS sg_project_group (
+    id            VARCHAR(32)  NOT NULL PRIMARY KEY COMMENT '主键ID',
+    org_id        VARCHAR(32)  NOT NULL COMMENT '所属组织/业务线ID',
+    project_name  VARCHAR(200) NOT NULL COMMENT '项目组名称',
+    project_code  VARCHAR(100) COMMENT '项目组编码',
+    leader_id     VARCHAR(32) COMMENT '组长用户ID',
+    status        TINYINT DEFAULT 1 COMMENT '状态 0:停用 1:启用',
+    sort_order    INT DEFAULT 0 COMMENT '排序',
+    create_time   DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    UNIQUE KEY uk_pg_code (project_code),
+    KEY idx_pg_org (org_id)
+) ENGINE=InnoDB COMMENT='项目组表';
+
+-- 项目组成员（人→项目组，含组内角色 + 主组标记）
+CREATE TABLE IF NOT EXISTS sg_project_group_member (
+    id               VARCHAR(32) NOT NULL PRIMARY KEY COMMENT '主键ID',
+    project_group_id VARCHAR(32) NOT NULL COMMENT '项目组ID',
+    user_id          VARCHAR(32) NOT NULL COMMENT '用户ID',
+    project_role_id  VARCHAR(32) COMMENT '组内角色ID',
+    is_primary       TINYINT DEFAULT 0 COMMENT '是否主项目组 0:否 1:是',
+    create_time      DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    UNIQUE KEY uk_pgm (project_group_id, user_id),
+    KEY idx_pgm_user (user_id)
+) ENGINE=InnoDB COMMENT='项目组成员表';
+
+-- 项目组角色（capability_flags 为能力位 JSON 数组；project_group_id 为空=全局模板）
+CREATE TABLE IF NOT EXISTS sg_project_role (
+    id               VARCHAR(32)  NOT NULL PRIMARY KEY COMMENT '主键ID',
+    org_id           VARCHAR(32) COMMENT '所属组织ID',
+    project_group_id VARCHAR(32) COMMENT '项目组ID（空=全局模板）',
+    role_name        VARCHAR(200) NOT NULL COMMENT '角色名称',
+    role_code        VARCHAR(100) COMMENT '角色编码',
+    capability_flags VARCHAR(1000) COMMENT '能力位标识集合(JSON数组，如 ["model:develop","report:develop"])',
+    status           TINYINT DEFAULT 1 COMMENT '状态 0:停用 1:启用',
+    sort_order       INT DEFAULT 0 COMMENT '排序',
+    create_time      DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    KEY idx_spr_group (project_group_id)
+) ENGINE=InnoDB COMMENT='项目组角色表';
+
+-- 项目组资源（组下绑定的开发任务/报表/表）
+CREATE TABLE IF NOT EXISTS sg_project_group_resource (
+    id               VARCHAR(32) NOT NULL PRIMARY KEY COMMENT '主键ID',
+    project_group_id VARCHAR(32) NOT NULL COMMENT '项目组ID',
+    resource_type    VARCHAR(50) NOT NULL COMMENT '资源类型 TASK/REPORT/TABLE',
+    resource_id      VARCHAR(32) NOT NULL COMMENT '资源ID',
+    create_time      DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    UNIQUE KEY uk_pgr (project_group_id, resource_type, resource_id)
+) ENGINE=InnoDB COMMENT='项目组资源表';
 
 -- ============================================================
 -- 2. 业务表 - 审批流程

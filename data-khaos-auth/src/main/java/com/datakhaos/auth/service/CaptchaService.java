@@ -25,8 +25,6 @@ public class CaptchaService {
     private static final long EXPIRE_MS = 5 * 60 * 1000L;
     private final Map<String, CaptchaEntry> store = new ConcurrentHashMap<>();
 
-    private final CaptchaProperties captchaProperties;
-
     /**
      * 生成验证码图片
      */
@@ -52,10 +50,6 @@ public class CaptchaService {
         if (!entry.code.equalsIgnoreCase(code.trim())) {
             throw new BusinessException("验证码错误");
         }
-    }
-
-    public boolean enabled() {
-        return captchaProperties.isEnabled();
     }
 
     private String renderPng(String code) {
