@@ -56,6 +56,10 @@
             <groupId>com.datakhaos</groupId>
             <artifactId>data-khaos-mart-api</artifactId>
         </dependency>
+        <dependency>
+            <groupId>com.datakhaos</groupId>
+            <artifactId>data-khaos-permission-api</artifactId>
+        </dependency>
     </dependencies>
 
     <build>

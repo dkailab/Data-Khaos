@@ -16,6 +16,9 @@ public class MartDimension extends BaseEntity {
     /** 维度名称 */
     private String dimName;
 
+    /** 项目组ID（权限隔离） */
+    private String projectGroupId;
+
     /** 维度编码 */
     private String dimCode;
 

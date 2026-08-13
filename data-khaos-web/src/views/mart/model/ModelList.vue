@@ -5,6 +5,11 @@
         <el-form-item label="关键字">
           <el-input v-model="query.keyword" placeholder="模型名称/编码" clearable style="width: 200px" @keyup.enter="load" />
         </el-form-item>
+        <el-form-item label="分层">
+          <el-select v-model="query.layerId" clearable placeholder="全部" style="width: 140px" @change="handleSearch">
+            <el-option v-for="l in layers" :key="l.id" :label="l.layerName" :value="l.id" />
+          </el-select>
+        </el-form-item>
         <el-form-item label="状态">
           <el-select v-model="query.status" clearable placeholder="全部" style="width: 130px" @change="handleSearch">
             <el-option label="草稿" :value="0" />
@@ -22,6 +27,11 @@
 
     <el-table v-loading="loading" :data="list" border stripe>
       <el-table-column prop="modelName" label="模型名称" min-width="150" />
+      <el-table-column label="分层" width="110">
+        <template #default="{ row }">
+          <el-tag :type="layerTagType(row.layerId)">{{ layerName(row.layerId) }}</el-tag>
+        </template>
+      </el-table-column>
       <el-table-column prop="modelCode" label="模型编码" min-width="140" />
       <el-table-column prop="modelType" label="类型" width="110">
         <template #default="{ row }">
@@ -61,6 +71,11 @@
       <el-form ref="formRef" :model="form" :rules="formRules" label-width="100px">
         <el-form-item label="模型名称" prop="modelName">
           <el-input v-model="form.modelName" placeholder="请输入模型名称" />
+        </el-form-item>
+        <el-form-item label="数仓分层" prop="layerId">
+          <el-select v-model="form.layerId" placeholder="请选择分层" style="width: 100%">
+            <el-option v-for="l in layers" :key="l.id" :label="`${l.layerName} (${l.layerCode})`" :value="l.id" />
+          </el-select>
         </el-form-item>
         <el-form-item label="模型编码" prop="modelCode">
           <el-input v-model="form.modelCode" placeholder="请输入模型编码" />
@@ -103,14 +118,15 @@ import { onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 import { Plus, Refresh, Search } from '@element-plus/icons-vue'
-import { createMartModel, deleteMartModel, offlineMartModel, pageMartModels, previewMartModel, publishMartModel, updateMartModel } from '@/api/mart'
-import type { MartModel, QueryResult } from '@/types'
+import { createMartModel, deleteMartModel, listMartLayers, offlineMartModel, pageMartModels, previewMartModel, publishMartModel, updateMartModel } from '@/api/mart'
+import type { MartModel, MartWarehouseLayer, QueryResult } from '@/types'
 
 const loading = ref(false)
 const submitting = ref(false)
 const list = ref<MartModel[]>([])
 const total = ref(0)
-const query = reactive<Record<string, any>>({ current: 1, size: 10, keyword: '', status: undefined })
+const layers = ref<MartWarehouseLayer[]>([])
+const query = reactive<Record<string, any>>({ current: 1, size: 10, keyword: '', layerId: undefined, status: undefined })
 
 const dialogVisible = ref(false)
 const formRef = ref<FormInstance>()
@@ -118,12 +134,25 @@ const isEdit = ref(false)
 const form = reactive<MartModel>({ modelType: 'STAR', status: 0, version: 1 })
 const formRules: FormRules = {
   modelName: [{ required: true, message: '请输入模型名称', trigger: 'blur' }],
+  layerId: [{ required: true, message: '请选择数仓分层', trigger: 'change' }],
   modelCode: [{ required: true, message: '请输入模型编码', trigger: 'blur' }],
 }
 
 const previewVisible = ref(false)
 const previewTarget = ref<MartModel | null>(null)
 const previewResult = ref<QueryResult | null>(null)
+
+function layerName(id?: string) {
+  return layers.value.find((l) => l.id === id)?.layerName ?? '-'
+}
+
+function layerTagType(id?: string): 'primary' | 'warning' | 'success' | 'info' {
+  const code = layers.value.find((l) => l.id === id)?.layerCode
+  if (code === 'ODS') return 'info'
+  if (code === 'DWD') return 'primary'
+  if (code === 'DWS') return 'warning'
+  return 'success'
+}
 
 function modelStatusText(s?: number) {
   return { 0: '草稿', 1: '已发布', 2: '已下线' }[s ?? -1] ?? '-'
@@ -153,13 +182,14 @@ function handleSearch() {
 
 function handleReset() {
   query.keyword = ''
+  query.layerId = undefined
   query.status = undefined
   handleSearch()
 }
 
 function openCreate() {
   isEdit.value = false
-  Object.assign(form, { modelName: '', modelCode: '', modelType: 'STAR', datasourceId: '', description: '', status: 0, version: 1 })
+  Object.assign(form, { modelName: '', layerId: '', modelCode: '', modelType: 'STAR', datasourceId: '', description: '', status: 0, version: 1 })
   dialogVisible.value = true
 }
 
@@ -218,7 +248,14 @@ async function showPreview(row: MartModel) {
   }
 }
 
-onMounted(load)
+onMounted(async () => {
+  try {
+    layers.value = await listMartLayers()
+  } catch {
+    layers.value = []
+  }
+  load()
+})
 </script>
 
 <style scoped>

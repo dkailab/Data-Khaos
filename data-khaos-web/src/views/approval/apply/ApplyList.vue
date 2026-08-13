@@ -59,6 +59,7 @@
             <el-option label="报表" value="REPORT" />
             <el-option label="数据源" value="DATASOURCE" />
             <el-option label="菜单" value="MENU" />
+            <el-option label="模型订阅" value="MART" />
           </el-select>
         </el-form-item>
         <el-form-item label="目标ID" prop="targetId">
@@ -130,7 +131,7 @@ const detailVisible = ref(false)
 const detail = ref<{ apply: AppApply; records: AppApprovalRecord[] }>({ apply: {}, records: [] })
 
 function applyTypeText(t?: string) {
-  return { TABLE: '表权限', REPORT: '报表', DATASOURCE: '数据源', MENU: '菜单' }[t ?? ''] ?? t ?? '-'
+  return { TABLE: '表权限', REPORT: '报表', DATASOURCE: '数据源', MENU: '菜单', MART: '模型订阅' }[t ?? ''] ?? t ?? '-'
 }
 
 function statusText(s?: number) {

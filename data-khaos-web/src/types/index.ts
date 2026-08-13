@@ -334,9 +334,41 @@ export interface MetaTableLineage {
 
 /* ==================== 数据集市 ==================== */
 
+/** 模型市场卡片 DTO（仅已发布，含统计） */
+export interface MarketModelDto {
+  id?: string
+  modelName?: string
+  modelCode?: string
+  /** STAR / SNOWFLAKE */
+  modelType?: string
+  datasourceId?: string
+  description?: string
+  /** 数仓分层ID */
+  layerId?: string
+  /** 数仓分层编码 ODS/DWD/DWS/ADS */
+  layerCode?: string
+  /** 数仓分层名称 */
+  layerName?: string
+  /** 项目组ID */
+  projectGroupId?: string
+  version?: number
+  /** 指标数 */
+  metricCount?: number
+  /** 维度数 */
+  dimensionCount?: number
+  /** 关联数 */
+  relCount?: number
+  publishTime?: string
+  updateTime?: string
+}
+
 export interface MartModel {
   id?: string
   modelName?: string
+  /** 项目组ID（权限隔离） */
+  projectGroupId?: string
+  /** 数仓分层ID */
+  layerId?: string
   modelCode?: string
   /** STAR / SNOWFLAKE */
   modelType?: string
@@ -347,6 +379,16 @@ export interface MartModel {
   version?: number
   createTime?: string
   updateTime?: string
+}
+
+/** 数仓分层（ODS/DWD/DWS/ADS） */
+export interface MartWarehouseLayer {
+  id?: string
+  layerCode?: string
+  layerName?: string
+  layerDesc?: string
+  sortOrder?: number
+  status?: number
 }
 
 export interface MartMetric {

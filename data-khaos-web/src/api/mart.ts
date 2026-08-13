@@ -1,18 +1,31 @@
 import { del, get, post, put } from './request'
 import type {
+  MarketModelDto,
   MartDimension,
   MartDimLevel,
   MartMetric,
   MartModel,
   MartModelRel,
+  MartWarehouseLayer,
   PageResult,
   QueryResult,
 } from '@/types'
+
+/* ==================== 数仓分层 ==================== */
+
+export function listMartLayers() {
+  return get<MartWarehouseLayer[]>('/mart/layer/list')
+}
 
 /* ==================== 模型 ==================== */
 
 export function pageMartModels(params: Record<string, any>) {
   return get<PageResult<MartModel>>('/mart/model/page', params)
+}
+
+/** 模型市场分页（仅已发布，含统计） */
+export function pageMartMarket(params: Record<string, any>) {
+  return get<PageResult<MarketModelDto>>('/mart/market/page', params)
 }
 
 export function martModelDetail(id: string) {

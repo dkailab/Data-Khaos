@@ -106,6 +106,18 @@ const routes: RouteRecordRaw[] = [
       },
       // 数据集市
       {
+        path: 'mart/market',
+        name: 'MartMarket',
+        component: () => import('@/views/mart/market/Market.vue'),
+        meta: { title: '模型市场' },
+      },
+      {
+        path: 'mart/market/:id',
+        name: 'MartMarketDetail',
+        component: () => import('@/views/mart/market/ModelDetail.vue'),
+        meta: { title: '模型详情' },
+      },
+      {
         path: 'mart/model',
         name: 'MartModel',
         component: () => import('@/views/mart/model/ModelList.vue'),

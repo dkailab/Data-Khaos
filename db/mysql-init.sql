@@ -296,21 +296,35 @@ CREATE TABLE IF NOT EXISTS meta_table_lineage (
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS mart_model (
-    id            VARCHAR(32) NOT NULL PRIMARY KEY COMMENT '主键ID',
-    model_name    VARCHAR(200) NOT NULL COMMENT '模型名称',
-    model_code    VARCHAR(100) NOT NULL COMMENT '模型编码',
-    model_type    VARCHAR(50) DEFAULT 'STAR' COMMENT '类型 STAR/SNOWFLAKE',
-    datasource_id VARCHAR(32) COMMENT '数据源ID',
-    description   VARCHAR(500) COMMENT '描述',
-    status        TINYINT DEFAULT 0 COMMENT '状态 0:草稿 1:已发布 2:下线',
-    version       INT DEFAULT 1 COMMENT '版本',
-    create_time   DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-    update_time   DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '更新时间',
+    id                 VARCHAR(32) NOT NULL PRIMARY KEY COMMENT '主键ID',
+    project_group_id   VARCHAR(32) COMMENT '项目组ID（权限隔离）',
+    layer_id           VARCHAR(32) COMMENT '分层ID',
+    model_name         VARCHAR(200) NOT NULL COMMENT '模型名称',
+    model_code         VARCHAR(100) NOT NULL COMMENT '模型编码',
+    model_type         VARCHAR(50) DEFAULT 'STAR' COMMENT '类型 STAR/SNOWFLAKE',
+    datasource_id      VARCHAR(32) COMMENT '数据源ID',
+    description        VARCHAR(500) COMMENT '描述',
+    status             TINYINT DEFAULT 0 COMMENT '状态 0:草稿 1:已发布 2:下线',
+    version            INT DEFAULT 1 COMMENT '版本',
+    create_time        DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    update_time        DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '更新时间',
     UNIQUE KEY uk_model_code (model_code)
-) ENGINE=InnoDB COMMENT='模型定义表';
+) ENGINE=InnoDB COMMENT='数据集市-语义模型定义表（按项目组权限隔离）';
+
+CREATE TABLE IF NOT EXISTS mart_warehouse_layer (
+    id          VARCHAR(32) NOT NULL PRIMARY KEY COMMENT '主键ID',
+    layer_code  VARCHAR(32) NOT NULL COMMENT '分层编码 ODS/DWD/DWS/ADS',
+    layer_name  VARCHAR(100) NOT NULL COMMENT '分层名称',
+    layer_desc  VARCHAR(500) COMMENT '分层说明',
+    sort_order  INT DEFAULT 0 COMMENT '排序',
+    status      TINYINT DEFAULT 1 COMMENT '状态 0:停用 1:启用',
+    create_time DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    UNIQUE KEY uk_layer_code (layer_code)
+) ENGINE=InnoDB COMMENT='数仓分层表（一线大厂标准：ODS/DWD/DWS/ADS）';
 
 CREATE TABLE IF NOT EXISTS mart_metric (
     id          VARCHAR(32) NOT NULL PRIMARY KEY COMMENT '主键ID',
+    project_group_id VARCHAR(32) COMMENT '项目组ID（权限隔离）',
     metric_name VARCHAR(200) NOT NULL COMMENT '指标名称',
     metric_code VARCHAR(100) NOT NULL COMMENT '指标编码',
     metric_type VARCHAR(50) DEFAULT 'ATOMIC' COMMENT '类型 ATOMIC/DERIVED',
@@ -328,6 +342,7 @@ CREATE TABLE IF NOT EXISTS mart_metric (
 
 CREATE TABLE IF NOT EXISTS mart_dimension (
     id            VARCHAR(32) NOT NULL PRIMARY KEY COMMENT '主键ID',
+    project_group_id VARCHAR(32) COMMENT '项目组ID（权限隔离）',
     dim_name      VARCHAR(200) NOT NULL COMMENT '维度名称',
     dim_code      VARCHAR(100) NOT NULL COMMENT '维度编码',
     dim_type      VARCHAR(50) DEFAULT 'COMMON' COMMENT '类型 COMMON/TIME/ORG',
@@ -351,6 +366,7 @@ CREATE TABLE IF NOT EXISTS mart_dim_level (
 
 CREATE TABLE IF NOT EXISTS mart_model_rel (
     id          VARCHAR(32) NOT NULL PRIMARY KEY COMMENT '主键ID',
+    project_group_id VARCHAR(32) COMMENT '项目组ID（权限隔离）',
     model_id    VARCHAR(32) NOT NULL COMMENT '模型ID',
     fact_table  VARCHAR(200) NOT NULL COMMENT '事实表',
     dim_table   VARCHAR(200) NOT NULL COMMENT '维度表',

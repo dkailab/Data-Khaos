@@ -20,6 +20,9 @@ public class MartMetric extends BaseEntity {
     /** 指标名称 */
     private String metricName;
 
+    /** 项目组ID（权限隔离） */
+    private String projectGroupId;
+
     /** 指标编码 */
     private String metricCode;
 

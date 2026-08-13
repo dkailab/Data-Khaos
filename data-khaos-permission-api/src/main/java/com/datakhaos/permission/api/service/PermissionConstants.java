@@ -23,6 +23,11 @@ public interface PermissionConstants {
     String PERM_MART_LIST = "data:mart:list";
     String PERM_MART_EDIT = "data:mart:edit";
 
+    /** 语义模型(Mart)能力位（permission-handbook §4.2） */
+    String CAP_MODEL_BROWSE = "model:browse";
+    String CAP_MODEL_DEVELOP = "model:develop";
+    String CAP_MODEL_PUBLISH = "model:publish";
+
     String PERM_SQL_EXECUTE = "query:sql:execute";
     String PERM_DASHBOARD_VIEW = "query:dashboard:view";
     String PERM_ANALYSIS_VIEW = "query:analysis:view";

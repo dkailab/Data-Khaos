@@ -16,6 +16,12 @@ public class ModelDto implements Serializable {
 
     private String modelName;
 
+    /** 项目组ID（权限隔离） */
+    private String projectGroupId;
+
+    /** 数仓分层ID */
+    private String layerId;
+
     private String modelCode;
 
     /** STAR / SNOWFLAKE */

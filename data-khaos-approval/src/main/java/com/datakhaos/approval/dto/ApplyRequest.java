@@ -12,7 +12,7 @@ public class ApplyRequest implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
-    /** 申请类型：TABLE / REPORT / DATASOURCE / MENU */
+    /** 申请类型：TABLE / REPORT / DATASOURCE / MENU / MART */
     private String applyType;
 
     /** 申请目标ID（TABLE 时为数据源ID） */

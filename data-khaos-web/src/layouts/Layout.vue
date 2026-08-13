@@ -130,6 +130,7 @@ const menus: MenuItem[] = [
     title: '数据集市',
     icon: 'DataBoard',
     children: [
+      { title: '模型市场', path: '/mart/market' },
       { title: '模型管理', path: '/mart/model' },
       { title: '指标管理', path: '/mart/metric' },
       { title: '维度管理', path: '/mart/dimension' },

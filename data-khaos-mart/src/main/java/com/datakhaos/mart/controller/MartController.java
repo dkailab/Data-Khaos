@@ -3,11 +3,13 @@ package com.datakhaos.mart.controller;
 import com.datakhaos.common.model.PageResult;
 import com.datakhaos.common.model.R;
 import com.datakhaos.datasource.api.model.QueryResult;
+import com.datakhaos.mart.api.model.MarketModelDto;
 import com.datakhaos.mart.entity.MartDimLevel;
 import com.datakhaos.mart.entity.MartDimension;
 import com.datakhaos.mart.entity.MartMetric;
 import com.datakhaos.mart.entity.MartModel;
 import com.datakhaos.mart.entity.MartModelRel;
+import com.datakhaos.mart.entity.MartWarehouseLayer;
 import com.datakhaos.mart.service.MartService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -28,21 +30,39 @@ public class MartController {
 
     private final MartService martService;
 
+    // ==================== 数仓分层 ====================
+
+    @Operation(summary = "数仓分层列表（启用状态）")
+    @GetMapping("/layer/list")
+    public R<List<MartWarehouseLayer>> listLayers() {
+        return R.ok(martService.listLayers());
+    }
+
     // ==================== 模型 ====================
 
-    @Operation(summary = "分页查询模型")
+    @Operation(summary = "分页查询模型（按项目组隔离，支持分层筛选）")
     @GetMapping("/model/page")
     public R<PageResult<MartModel>> modelPage(@RequestParam(defaultValue = "1") long current,
                                               @RequestParam(defaultValue = "10") long size,
                                               @RequestParam(required = false) String keyword,
-                                              @RequestParam(required = false) Integer status) {
-        return R.ok(martService.modelPage(current, size, keyword, status));
+                                              @RequestParam(required = false) Integer status,
+                                              @RequestParam(required = false) String layerId) {
+        return R.ok(martService.modelPage(current, size, keyword, status, layerId));
     }
 
     @Operation(summary = "模型详情（含指标/维度/关联）")
     @GetMapping("/model/{id}")
     public R<Map<String, Object>> modelDetail(@PathVariable String id) {
         return R.ok(martService.modelDetail(id));
+    }
+
+    @Operation(summary = "模型市场分页（仅已发布，按项目组隔离，含统计）")
+    @GetMapping("/market/page")
+    public R<PageResult<MarketModelDto>> marketPage(@RequestParam(defaultValue = "1") long current,
+                                                    @RequestParam(defaultValue = "12") long size,
+                                                    @RequestParam(required = false) String keyword,
+                                                    @RequestParam(required = false) String layerId) {
+        return R.ok(martService.marketPage(current, size, keyword, layerId));
     }
 
     @Operation(summary = "新增模型")

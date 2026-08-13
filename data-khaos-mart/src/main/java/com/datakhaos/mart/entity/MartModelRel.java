@@ -16,6 +16,9 @@ public class MartModelRel extends BaseEntity {
     /** 模型ID */
     private String modelId;
 
+    /** 项目组ID（权限隔离） */
+    private String projectGroupId;
+
     /** 事实表 */
     private String factTable;
 

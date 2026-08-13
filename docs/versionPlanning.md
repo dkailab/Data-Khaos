@@ -154,8 +154,35 @@
 
 ## 7. 当前能力边界与后续规划方向
 
-- 当前权限为 RBAC + 组织 + 表/行/列级，尚未引入「组织 → 项目组 → 人」的业务协作单元。
-- 规划方向（见 `docs/permission-handbook.md`）：引入项目组角色与能力位，表权限支持「个人 + 项目组」两种主体并存，实现「人加入项目组即获得组内权限」。
+- 当前权限为 RBAC + 组织 + 表/行/列级，已经完成「组织 → 项目组 → 人」三级模型落地，实现**项目组角色+能力位+数据隔离**。
+- 后续规划：数据治理（数据质量稽核，见 `docs/dquality-requirements.md`）、高级数据源、AI-Agent 深度分析、企业版能力沉淀。
+
+---
+
+## 8. 版本变更记录
+
+### v1.0.0-20260813（本轮更新）
+
+**核心新增：**
+1. **数仓模型市场**：按一线大厂标准，引入 ODS/DWD/DWS/ADS 标准分层，新增 `mart_warehouse_layer` 表 + 增量迁移脚本。
+2. **项目组权限隔离**：`mart_model/metric/dimension/rel` 增加 `project_group_id`，所有查询按当前项目组过滤，符合 `permission-handbook.md` 规范。
+3. **能力位校验**：新增 `model:browse/model:develop/model:publish` 能力位，CRUD/发布按能力位校验。
+4. **模型市场前端**：新增模型市场浏览页（卡片式网格）、模型详情页，支持"申请订阅"和数据预览。
+5. **审批扩展**：审批模块新增 `MART`（模型订阅）类型，支持数据订阅审批流。
+6. **文档新增**：
+   - `docs/open-core-plan.md`：Open-Core 开放核心模式规划（社区版/企业版双版本、代码治理、防白嫖机制）
+   - `docs/dquality-requirements.md`：数据质量稽核模块需求文档
+
+**变更统计：**
+- 修改文件：17 个
+- 新增文件：9 个（模块实体 + 前端页面 + 文档 + 迁移脚本）
+- 代码行数：+376 / -24
+
+**涉及模块：**
+- `data-khaos-mart` / `data-khaos-mart-api` / `data-khaos-permission-api` / `data-khaos-approval`
+- `data-khaos-web`（前端：views + api + types + router + layout）
+- `db`（mysql-init + migration + seed）
+- `docs`
 
 ---
 

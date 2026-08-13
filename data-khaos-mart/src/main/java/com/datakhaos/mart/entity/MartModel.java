@@ -20,6 +20,12 @@ public class MartModel extends BaseEntity {
     /** 模型名称 */
     private String modelName;
 
+    /** 项目组ID（权限隔离） */
+    private String projectGroupId;
+
+    /** 数仓分层ID（ODS/DWD/DWS/ADS） */
+    private String layerId;
+
     /** 模型编码 */
     private String modelCode;
 
