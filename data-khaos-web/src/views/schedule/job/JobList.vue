@@ -93,7 +93,8 @@
           <el-input v-model="form.targetTable" placeholder="请输入目标表" />
         </el-form-item>
         <el-form-item label="参数(JSON)" prop="params">
-          <el-input v-model="form.params" type="textarea" :rows="2" placeholder='如 {"batchSize": 1000}' />
+          <el-input v-model="form.params" type="textarea" :rows="2"
+            :placeholder="form.jobType === 'QUALITY' ? '质量任务ID，如 {\"taskId\": \"质量任务ID\"}' : '如 {\"batchSize\": 1000}'" />
         </el-form-item>
         <el-form-item label="失败重试次数" prop="retryCount">
           <el-input-number v-model="form.retryCount" :min="0" :max="10" />
@@ -163,6 +164,7 @@ import type { ScheduleJob, ScheduleJobLog } from '@/types'
 const jobTypes = [
   { label: '同步 SYNC', value: 'SYNC' },
   { label: 'SQL', value: 'SQL' },
+  { label: '质量稽核 QUALITY', value: 'QUALITY' },
   { label: '刷新 REFRESH', value: 'REFRESH' },
   { label: '推送 PUSH', value: 'PUSH' },
 ]

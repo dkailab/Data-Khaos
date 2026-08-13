@@ -12,6 +12,6 @@ import org.springframework.stereotype.Component;
 @ConfigurationProperties(prefix = "data-khaos.captcha")
 public class CaptchaProperties {
 
-    /** 验证码强制开启，登录必填，不可关闭 */
+    /** 验证码开关：true 强制登录必填；false 关闭（开发/自动化环境） */
     private boolean enabled = true;
 }

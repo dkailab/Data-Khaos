@@ -24,6 +24,7 @@ public class CaptchaService {
 
     private static final long EXPIRE_MS = 5 * 60 * 1000L;
     private final Map<String, CaptchaEntry> store = new ConcurrentHashMap<>();
+    private final CaptchaProperties properties;
 
     /**
      * 生成验证码图片
@@ -37,9 +38,12 @@ public class CaptchaService {
     }
 
     /**
-     * 校验验证码（一次有效）
+     * 校验验证码（一次有效）；enabled=false 时跳过（用于开发/自动化环境）
      */
     public void validate(String captchaId, String code) {
+        if (!properties.isEnabled()) {
+            return;
+        }
         if (code == null) {
             throw new BusinessException("验证码不能为空");
         }

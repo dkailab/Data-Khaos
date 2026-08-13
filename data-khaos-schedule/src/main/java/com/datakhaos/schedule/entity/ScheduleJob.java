@@ -20,7 +20,7 @@ public class ScheduleJob extends BaseEntity {
     /** 任务名称 */
     private String jobName;
 
-    /** SYNC / SQL / REFRESH / PUSH */
+    /** SQL / QUALITY / SYNC / REFRESH / PUSH */
     private String jobType;
 
     /** 分组 */

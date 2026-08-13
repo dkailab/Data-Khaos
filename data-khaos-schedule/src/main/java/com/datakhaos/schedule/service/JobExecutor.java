@@ -1,10 +1,12 @@
 package com.datakhaos.schedule.service;
 
 import cn.hutool.core.util.StrUtil;
+import cn.hutool.json.JSONUtil;
 import com.datakhaos.common.exception.BusinessException;
 import com.datakhaos.common.model.R;
 import com.datakhaos.datasource.api.connector.DatasourceApiClient;
 import com.datakhaos.datasource.api.model.QueryResult;
+import com.datakhaos.schedule.client.DQualityApiClient;
 import com.datakhaos.schedule.entity.ScheduleJob;
 import com.datakhaos.schedule.entity.ScheduleJobLog;
 import com.datakhaos.schedule.mapper.ScheduleJobLogMapper;
@@ -28,6 +30,7 @@ public class JobExecutor {
 
     private final ScheduleJobLogMapper jobLogMapper;
     private final DatasourceApiClient datasourceApiClient;
+    private final DQualityApiClient dQualityApiClient;
 
     /** 正在运行的任务ID（防止并发触发同一任务） */
     private final Set<String> running = ConcurrentHashMap.newKeySet();
@@ -103,12 +106,38 @@ public class JobExecutor {
                 QueryResult data = result.getData();
                 return data == null || data.getRowCount() == null ? 0 : data.getRowCount();
             }
+            case "QUALITY" -> {
+                // 数据质量周期稽核：params 需携带质量任务ID，如 {"taskId":"..."}
+                String taskId = parseTaskId(job.getParams());
+                if (StrUtil.isBlank(taskId)) {
+                    throw new BusinessException("QUALITY 任务未配置质量任务ID（params.taskId）");
+                }
+                R<Void> r = dQualityApiClient.runTask(taskId, "SCHEDULE");
+                if (r == null || r.getCode() != 0) {
+                    throw new BusinessException(r == null ? "质量稽核触发失败" : r.getMsg());
+                }
+                return 1;
+            }
             case "REFRESH", "SYNC", "PUSH" -> {
                 // 接入外部数据同步 / 推送链路后扩展
                 log.info("任务类型 {} 暂以成功标记完成（预留实现）", type);
                 return 0;
             }
             default -> throw new BusinessException("不支持的任务类型: " + job.getJobType());
+        }
+    }
+
+    /** 从 params JSON 解析质量任务ID */
+    private String parseTaskId(String params) {
+        if (StrUtil.isBlank(params)) {
+            return null;
+        }
+        try {
+            cn.hutool.json.JSONObject obj = JSONUtil.parseObj(params);
+            return obj.getStr("taskId");
+        } catch (Exception e) {
+            log.warn("解析任务 params 失败: {}", params);
+            return null;
         }
     }
 }

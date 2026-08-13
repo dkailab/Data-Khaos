@@ -674,7 +674,7 @@ export interface VisualAdhocHistory {
 export interface ScheduleJob {
   id?: string
   jobName?: string
-  /** SYNC / SQL / REFRESH / PUSH */
+  /** SQL / QUALITY / SYNC / REFRESH / PUSH */
   jobType?: string
   jobGroup?: string
   cronExpression?: string
