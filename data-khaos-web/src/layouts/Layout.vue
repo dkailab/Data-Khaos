@@ -1,51 +1,110 @@
 <template>
-  <el-container class="layout">
-    <el-aside :width="collapsed ? '64px' : '220px'" class="aside">
-      <div class="logo">
-        <el-icon :size="26" color="#409eff"><DataAnalysis /></el-icon>
-        <span v-show="!collapsed" class="logo-title">Data Khaos</span>
-      </div>
-      <el-menu
-        :default-active="activeMenu"
-        :collapse="collapsed"
-        :collapse-transition="false"
-        background-color="#001529"
-        text-color="rgba(255,255,255,0.72)"
-        active-text-color="#ffffff"
-        router
-      >
-        <template v-for="item in menus" :key="item.path">
-          <el-menu-item v-if="!item.children || item.children.length === 0" :index="item.path!">
-            <el-icon v-if="item.icon"><component :is="item.icon" /></el-icon>
-            <template #title>{{ item.title }}</template>
-          </el-menu-item>
-          <el-sub-menu v-else :index="item.title">
-            <template #title>
-              <el-icon v-if="item.icon"><component :is="item.icon" /></el-icon>
-              <span>{{ item.title }}</span>
-            </template>
-            <el-menu-item v-for="child in item.children" :key="child.path" :index="child.path!">
-              <el-icon v-if="child.icon"><component :is="child.icon" /></el-icon>
-              <template #title>{{ child.title }}</template>
-            </el-menu-item>
-          </el-sub-menu>
-        </template>
-      </el-menu>
-    </el-aside>
-
-    <el-container class="main">
-      <el-header class="header" height="56px">
-        <div class="header-left">
-          <el-icon class="collapse-btn" @click="collapsed = !collapsed">
-            <Expand v-if="collapsed" />
-            <Fold v-else />
-          </el-icon>
-          <el-breadcrumb separator="/">
-            <el-breadcrumb-item :to="{ path: '/dashboard' }">首页</el-breadcrumb-item>
-            <el-breadcrumb-item v-if="currentTitle">{{ currentTitle }}</el-breadcrumb-item>
-          </el-breadcrumb>
+  <div class="portal">
+    <!-- ================= 顶部通栏全局导航栏 ================= -->
+    <header class="nav-bar">
+      <div class="nav-inner">
+        <div class="nav-logo" @click="router.push('/dashboard')">
+          <el-icon :size="24" color="#fff"><DataAnalysis /></el-icon>
+          <span class="nav-logo-text">Data Khaos</span>
         </div>
-        <div class="header-right">
+
+        <nav class="nav-menu">
+          <div class="nav-item" @click="router.push('/dashboard')" :class="{ active: route.path === '/dashboard' }">
+            首页
+          </div>
+
+          <!-- 门户地图：悬浮下拉弹窗 -->
+          <div
+            class="nav-item nav-map"
+            :class="{ active: mapOpen }"
+            @mouseenter="mapOpen = true"
+            @mouseleave="mapOpen = false"
+          >
+            门户地图
+            <el-icon class="nav-arrow"><ArrowDown /></el-icon>
+            <transition name="map-fade">
+              <div v-show="mapOpen" class="map-panel">
+                <div
+                  v-for="module in portalModules"
+                  :key="module.key"
+                  class="map-module"
+                  @mouseenter="hoverModule = module.key"
+                >
+                  <div class="map-module-head">
+                    <el-icon :size="18" color="#165dff"><component :is="module.icon" /></el-icon>
+                    <span>{{ module.title }}</span>
+                  </div>
+                  <div class="map-module-body">
+                    <template v-for="feat in module.features" :key="feat.title">
+                      <span
+                        v-if="feat.path"
+                        class="map-feature"
+                        :class="{ todo: feat.todo }"
+                        @click="go(feat.path)"
+                      >
+                        {{ feat.title }}
+                      </span>
+                      <span v-else class="map-feature todo" @click="showTodo(feat.title)">
+                        {{ feat.title }}（待建设）
+                      </span>
+                    </template>
+                  </div>
+                </div>
+              </div>
+            </transition>
+          </div>
+
+          <!-- 六大一级模块导航 -->
+          <template v-for="mod in portalModules" :key="mod.key">
+            <div
+              class="nav-item"
+              :class="{ active: activeModule === mod.key }"
+              @mouseenter="activeModule = mod.key"
+              @mouseleave="activeModule = ''"
+              @click="goModule(mod)"
+            >
+              {{ mod.title }}
+              <el-icon class="nav-arrow"><ArrowDown /></el-icon>
+              <transition name="map-fade">
+                <div v-show="activeModule === mod.key" class="map-panel mod-panel">
+                  <div class="map-module">
+                    <div class="map-module-head">
+                      <el-icon :size="18" color="#165dff"><component :is="mod.icon" /></el-icon>
+                      <span>{{ mod.title }}</span>
+                    </div>
+                    <div class="map-module-body">
+                      <template v-for="feat in mod.features" :key="feat.title">
+                        <span v-if="feat.path" class="map-feature" @click="go(feat.path)">{{ feat.title }}</span>
+                        <span v-else class="map-feature todo" @click="showTodo(feat.title)">{{ feat.title }}（待建设）</span>
+                      </template>
+                    </div>
+                  </div>
+                </div>
+              </transition>
+            </div>
+          </template>
+        </nav>
+
+        <div class="nav-right">
+          <div class="nav-item nav-extra" @mouseenter="extraOpen = true" @mouseleave="extraOpen = false">
+            系统管理
+            <el-icon class="nav-arrow"><ArrowDown /></el-icon>
+            <transition name="map-fade">
+              <div v-show="extraOpen" class="map-panel extra-panel">
+                <div class="map-module">
+                  <div class="map-module-body">
+                    <span class="map-feature" @click="go('/system/user')">用户管理</span>
+                    <span class="map-feature" @click="go('/system/role')">角色管理</span>
+                    <span class="map-feature" @click="go('/system/menu')">菜单管理</span>
+                    <span class="map-feature" @click="go('/system/org')">组织管理</span>
+                    <span class="map-feature" @click="go('/approval/apply')">审批中心</span>
+                    <span class="map-feature" @click="go('/notification/template')">通知中心</span>
+                  </div>
+                </div>
+              </div>
+            </transition>
+          </div>
+
           <el-dropdown @command="handleCommand">
             <span class="user-info">
               <el-avatar :size="30" class="avatar">
@@ -61,126 +120,150 @@
             </template>
           </el-dropdown>
         </div>
-      </el-header>
+      </div>
+    </header>
 
-      <el-main class="content">
-        <router-view />
-      </el-main>
-    </el-container>
-  </el-container>
+    <!-- ================= 内容区 ================= -->
+    <main class="portal-content">
+      <router-view />
+    </main>
+  </div>
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessageBox } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore } from '@/stores/user'
 
-interface MenuItem {
+interface Feature {
   title: string
   path?: string
-  icon?: string
-  children?: MenuItem[]
+  todo?: boolean
+}
+interface Module {
+  key: string
+  title: string
+  icon: string
+  features: Feature[]
 }
 
-const menus: MenuItem[] = [
-  { title: '首页', path: '/dashboard', icon: 'HomeFilled' },
+/* 数据工程六大模块：对齐已实现功能，未建设功能标注待建设 */
+const portalModules: Module[] = [
   {
-    title: '系统管理',
-    icon: 'Setting',
-    children: [
-      { title: '用户管理', path: '/system/user' },
-      { title: '角色管理', path: '/system/role' },
-      { title: '菜单管理', path: '/system/menu' },
-      { title: '组织管理', path: '/system/org' },
-    ],
-  },
-  {
-    title: '权限管理',
-    icon: 'Lock',
-    children: [
-      { title: '行权限策略', path: '/permission/policy-row' },
-      { title: '列权限策略', path: '/permission/policy-column' },
-      { title: '表权限', path: '/permission/table' },
-    ],
-  },
-  {
-    title: '审批中心',
-    icon: 'DocumentChecked',
-    children: [
-      { title: '我的申请', path: '/approval/apply' },
-      { title: '待办审批', path: '/approval/todo' },
-    ],
-  },
-  {
-    title: '数据源管理',
+    key: 'ingress',
+    title: '数据接入',
     icon: 'Connection',
-    children: [{ title: '数据源列表', path: '/datasource/list' }],
-  },
-  {
-    title: '元数据中心',
-    icon: 'Collection',
-    children: [
-      { title: '库表结构', path: '/metadata/structure' },
-      { title: '血缘关系', path: '/metadata/lineage' },
-      { title: '元数据搜索', path: '/metadata/search' },
+    features: [
+      { title: '数据源管理', path: '/datasource/list' },
+      { title: '数据库连接配置', path: '/datasource/list' },
+      { title: '数据同步任务' },
+      { title: '实时数据接入' },
+      { title: '离线数据采集' },
+      { title: '接口数据接入' },
+      { title: '文件数据导入' },
     ],
   },
   {
-    title: '数据集市',
-    icon: 'DataBoard',
-    children: [
-      { title: '模型市场', path: '/mart/market' },
-      { title: '模型管理', path: '/mart/model' },
-      { title: '指标管理', path: '/mart/metric' },
-      { title: '维度管理', path: '/mart/dimension' },
-    ],
-  },
-  {
-    title: 'SQL 查询',
+    key: 'dev',
+    title: '数据开发',
     icon: 'EditPen',
-    children: [
-      { title: '查询工作台', path: '/query/query' },
-      { title: '即席分析', path: '/visual/adhoc' },
+    features: [
+      { title: 'SQL 开发编辑器', path: '/query/query' },
+      { title: '任务调度管理', path: '/schedule/job' },
+      { title: '定时任务配置', path: '/schedule/job' },
+      { title: '数据脚本管理' },
+      { title: '工作流编排' },
+      { title: '任务监控' },
+      { title: '脚本版本管理' },
     ],
   },
   {
-    title: '可视化',
-    icon: 'PieChart',
-    children: [{ title: '仪表板管理', path: '/visual/dashboard' }],
-  },
-  {
-    title: '数据质量',
+    key: 'govern',
+    title: '数据治理',
     icon: 'Odometer',
-    children: [
-      { title: '质量规则', path: '/dquality/rule' },
-      { title: '质量任务', path: '/dquality/task' },
-      { title: '稽核报告', path: '/dquality/snapshot' },
+    features: [
+      { title: '数据质量校验', path: '/dquality/rule' },
+      { title: '元数据管理', path: '/metadata/structure' },
+      { title: '数据血缘分析', path: '/metadata/lineage' },
+      { title: '数据字典管理' },
+      { title: '数据标准配置' },
+      { title: '数据脱敏管理' },
+      { title: '重复数据清洗' },
     ],
   },
   {
-    title: '调度中心',
-    icon: 'AlarmClock',
-    children: [{ title: '调度任务', path: '/schedule/job' }],
+    key: 'asset',
+    title: '数据资产',
+    icon: 'DataBoard',
+    features: [
+      { title: '数据表资产', path: '/metadata/structure' },
+      { title: '指标资产', path: '/mart/metric' },
+      { title: '资产权限管理', path: '/permission/table' },
+      { title: '资产目录查询' },
+      { title: '标签资产' },
+      { title: '资产热度分析' },
+      { title: '资产检索' },
+    ],
   },
   {
-    title: '通知中心',
-    icon: 'Bell',
-    children: [
-      { title: '通知模板', path: '/notification/template' },
-      { title: '发送通知', path: '/notification/send' },
-      { title: '订阅管理', path: '/notification/subscription' },
+    key: 'service',
+    title: '数据服务',
+    icon: 'Share',
+    features: [
+      { title: '报表服务', path: '/visual/dashboard' },
+      { title: '自助取数', path: '/visual/adhoc' },
+      { title: '模型市场', path: '/mart/market' },
+      { title: '数据接口服务' },
+      { title: 'API 发布管理' },
+      { title: '数据共享服务' },
+      { title: '数据导出服务' },
+    ],
+  },
+  {
+    key: 'ops',
+    title: '监控运维',
+    icon: 'Monitor',
+    features: [
+      { title: '任务运行监控' },
+      { title: '数据告警中心', path: '/notification/send' },
+      { title: '日志查询' },
+      { title: '系统资源监控' },
+      { title: '权限管理', path: '/permission/table' },
+      { title: '用户管理', path: '/system/user' },
+      { title: '操作审计' },
     ],
   },
 ]
 
-const collapsed = ref(false)
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
 
-const activeMenu = computed(() => route.path)
-const currentTitle = computed(() => route.meta?.title as string | undefined)
+const mapOpen = ref(false)
+const extraOpen = ref(false)
+const hoverModule = ref('')
+const activeModule = ref('')
+
+function go(path: string) {
+  mapOpen.value = false
+  extraOpen.value = false
+  activeModule.value = ''
+  router.push(path)
+}
+
+function goModule(mod: Module) {
+  const first = mod.features.find((f) => f.path)
+  if (first?.path) {
+    go(first.path)
+  } else {
+    showTodo(mod.title)
+  }
+}
+
+function showTodo(name: string) {
+  ElMessage.info(`「${name}」功能正在建设中，敬请期待`)
+}
 
 async function handleCommand(command: string) {
   if (command === 'logout') {
@@ -192,67 +275,179 @@ async function handleCommand(command: string) {
 </script>
 
 <style scoped>
-.layout {
+.portal {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--datakhaos-bg);
+}
+
+/* ============ 顶部通栏导航栏 ============ */
+.nav-bar {
+  flex-shrink: 0;
+  height: 60px;
+  background: linear-gradient(120deg, #7fb8e6 0%, #165dff 100%);
+  box-shadow: 0 2px 12px rgba(22, 93, 255, 0.18);
+  position: relative;
+  z-index: 100;
+}
+.nav-inner {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  padding: 0 20px;
+  gap: 24px;
+}
+.nav-logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.nav-logo-text {
+  font-size: 20px;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: 0.02em;
+}
+.nav-menu {
+  flex: 1;
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
   height: 100%;
 }
-.aside {
-  background-color: #001529;
-  transition: width 0.2s;
-  overflow-x: hidden;
-}
-.logo {
-  height: 56px;
+.nav-item {
+  position: relative;
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 8px;
-  color: #fff;
-}
-.logo-title {
-  font-size: 16px;
-  font-weight: 600;
+  gap: 5px;
+  padding: 0 16px;
+  height: 100%;
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 15px;
+  cursor: pointer;
+  border-radius: 8px;
+  transition: background 0.2s;
   white-space: nowrap;
 }
-.aside :deep(.el-menu) {
-  border-right: none;
+.nav-item:hover,
+.nav-item.active {
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
 }
-.main {
-  min-width: 0;
+.nav-arrow {
+  font-size: 12px;
 }
-.header {
+.nav-right {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  background: #fff;
-  box-shadow: 0 1px 4px rgba(0, 21, 41, 0.08);
-  z-index: 1;
+  gap: 4px;
+  flex-shrink: 0;
+  height: 100%;
 }
-.header-left {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-.collapse-btn {
-  font-size: 20px;
-  cursor: pointer;
-  color: #606266;
+.nav-extra {
+  padding: 0 12px;
 }
 .user-info {
   display: flex;
   align-items: center;
   gap: 8px;
   cursor: pointer;
-  color: #303133;
+  color: #fff;
   outline: none;
+  padding: 0 8px;
 }
 .avatar {
-  background: #409eff;
+  background: rgba(255, 255, 255, 0.25);
 }
 .username {
   font-size: 14px;
+  color: #fff;
 }
-.content {
-  background: #f0f2f5;
+
+/* ============ 门户地图悬浮下拉弹窗 ============ */
+.map-panel {
+  position: absolute;
+  top: calc(100% + 10px);
+  left: 0;
+  min-width: 420px;
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(8px);
+  border: 1px solid #d3e6f7;
+  border-radius: 12px;
+  box-shadow: 0 8px 30px rgba(22, 93, 255, 0.12);
+  padding: 16px;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+.mod-panel {
+  grid-template-columns: 1fr;
+  min-width: 260px;
+}
+.extra-panel {
+  grid-template-columns: 1fr;
+  min-width: 200px;
+}
+.map-module-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 700;
+  color: #1d2129;
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #eaf3fb;
+}
+.map-module-body {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.map-feature {
+  display: inline-block;
+  padding: 5px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  color: #4e5969;
+  background: #f2f8fd;
+  border: 1px solid #eaf3fb;
+  cursor: pointer;
+  transition: all 0.18s;
+}
+.map-feature:hover {
+  background: linear-gradient(120deg, #7fb8e6, #165dff);
+  color: #fff;
+  border-color: transparent;
+}
+.map-feature.todo {
+  color: #a9aeb8;
+  background: #f7f8fa;
+  cursor: not-allowed;
+}
+.map-feature.todo:hover {
+  background: #f7f8fa;
+  color: #a9aeb8;
+  transform: none;
+}
+
+.map-fade-enter-active,
+.map-fade-leave-active {
+  transition: opacity 0.18s, transform 0.18s;
+}
+.map-fade-enter-from,
+.map-fade-leave-to {
+  opacity: 0;
+  transform: translateY(-6px);
+}
+
+/* ============ 内容区 ============ */
+.portal-content {
+  flex: 1;
   overflow: auto;
+  padding: 16px;
 }
 </style>
