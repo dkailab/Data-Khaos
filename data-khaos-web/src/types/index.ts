@@ -157,7 +157,15 @@ export interface UserPermissionDto {
   roles: string[]
   permissions: string[]
   menus: MenuDto[]
+  /** 当前项目组角色合并后的能力位集合（如 module:config / quality:manage 等） */
+  capabilityFlags?: string[]
 }
+
+/** 能力位常量（与后端 PermissionConstants 对齐） */
+export const CAP = {
+  /** 门户模块展示配置（管理员级，全局可插拔模块开关） */
+  MODULE_CONFIG: 'module:config',
+} as const
 
 export interface MenuDto {
   id: string
@@ -773,4 +781,39 @@ export interface NotifySubscription {
   channel?: string
   status?: number
   createTime?: string
+}
+
+/* ==================== 门户可插拔模块配置 ==================== */
+
+/** 模块归属分类（与后端 / 前端注册表一致） */
+export type ModuleCategory =
+  | 'ingress' // 数据接入
+  | 'dev' // 数据开发
+  | 'govern' // 数据治理
+  | 'asset' // 数据资产
+  | 'service' // 数据服务
+  | 'ops' // 监控运维
+  | 'system' // 系统管理
+
+/** 门户模块展示配置（module_display_config 表实体） */
+export interface ModuleDisplayConfig {
+  /** 模块唯一标识（主键，与前端注册表 moduleKey 对应） */
+  moduleKey: string
+  /** 模块展示名称 */
+  moduleName: string
+  /** 归属分类 */
+  category: ModuleCategory
+  /** 分类展示名 */
+  categoryName?: string
+  /** 图标 */
+  icon?: string
+  /** 路由路径（空=待建设） */
+  path?: string
+  /** 1=系统必须，不可取消 0=可配置 */
+  mandatory?: number
+  /** 1=显示 0=隐藏 */
+  visible?: number
+  sortOrder?: number
+  createdTime?: string
+  updatedTime?: string
 }

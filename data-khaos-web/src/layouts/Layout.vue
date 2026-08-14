@@ -25,7 +25,7 @@
             <transition name="map-fade">
               <div v-show="mapOpen" class="map-panel">
                 <div
-                  v-for="module in portalModules"
+                  v-for="module in categories"
                   :key="module.key"
                   class="map-module"
                   @mouseenter="hoverModule = module.key"
@@ -35,11 +35,10 @@
                     <span>{{ module.title }}</span>
                   </div>
                   <div class="map-module-body">
-                    <template v-for="feat in module.features" :key="feat.title">
+                    <template v-for="feat in module.features" :key="feat.key">
                       <span
                         v-if="feat.path"
                         class="map-feature"
-                        :class="{ todo: feat.todo }"
                         @click="go(feat.path)"
                       >
                         {{ feat.title }}
@@ -54,8 +53,8 @@
             </transition>
           </div>
 
-          <!-- 六大一级模块导航 -->
-          <template v-for="mod in portalModules" :key="mod.key">
+          <!-- 六大分类模块导航（按可插拔配置渲染） -->
+          <template v-for="mod in categories" :key="mod.key">
             <div
               class="nav-item"
               :class="{ active: activeModule === mod.key }"
@@ -73,7 +72,7 @@
                       <span>{{ mod.title }}</span>
                     </div>
                     <div class="map-module-body">
-                      <template v-for="feat in mod.features" :key="feat.title">
+                      <template v-for="feat in mod.features" :key="feat.key">
                         <span v-if="feat.path" class="map-feature" @click="go(feat.path)">{{ feat.title }}</span>
                         <span v-else class="map-feature todo" @click="showTodo(feat.title)">{{ feat.title }}（待建设）</span>
                       </template>
@@ -93,12 +92,10 @@
               <div v-show="extraOpen" class="map-panel extra-panel">
                 <div class="map-module">
                   <div class="map-module-body">
-                    <span class="map-feature" @click="go('/system/user')">用户管理</span>
-                    <span class="map-feature" @click="go('/system/role')">角色管理</span>
-                    <span class="map-feature" @click="go('/system/menu')">菜单管理</span>
-                    <span class="map-feature" @click="go('/system/org')">组织管理</span>
-                    <span class="map-feature" @click="go('/approval/apply')">审批中心</span>
-                    <span class="map-feature" @click="go('/notification/template')">通知中心</span>
+                    <template v-for="feat in systemCategory.features" :key="feat.key">
+                      <span v-if="feat.path" class="map-feature" @click="go(feat.path)">{{ feat.title }}</span>
+                    </template>
+                    <span v-if="canConfig" class="map-feature accent" @click="go('/system/module-config')">门户模块配置</span>
                   </div>
                 </div>
               </div>
@@ -115,6 +112,7 @@
             </span>
             <template #dropdown>
               <el-dropdown-menu>
+                <el-dropdown-item v-if="canConfig" command="moduleConfig">门户模块配置</el-dropdown-item>
                 <el-dropdown-item command="logout">退出登录</el-dropdown-item>
               </el-dropdown-menu>
             </template>
@@ -131,114 +129,25 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore } from '@/stores/user'
-
-interface Feature {
-  title: string
-  path?: string
-  todo?: boolean
-}
-interface Module {
-  key: string
-  title: string
-  icon: string
-  features: Feature[]
-}
-
-/* 数据工程六大模块：对齐已实现功能，未建设功能标注待建设 */
-const portalModules: Module[] = [
-  {
-    key: 'ingress',
-    title: '数据接入',
-    icon: 'Connection',
-    features: [
-      { title: '数据源管理', path: '/datasource/list' },
-      { title: '数据库连接配置', path: '/datasource/list' },
-      { title: '数据同步任务' },
-      { title: '实时数据接入' },
-      { title: '离线数据采集' },
-      { title: '接口数据接入' },
-      { title: '文件数据导入' },
-    ],
-  },
-  {
-    key: 'dev',
-    title: '数据开发',
-    icon: 'EditPen',
-    features: [
-      { title: 'SQL 开发编辑器', path: '/query/query' },
-      { title: '任务调度管理', path: '/schedule/job' },
-      { title: '定时任务配置', path: '/schedule/job' },
-      { title: '数据脚本管理' },
-      { title: '工作流编排' },
-      { title: '任务监控' },
-      { title: '脚本版本管理' },
-    ],
-  },
-  {
-    key: 'govern',
-    title: '数据治理',
-    icon: 'Odometer',
-    features: [
-      { title: '数据质量校验', path: '/dquality/rule' },
-      { title: '元数据管理', path: '/metadata/structure' },
-      { title: '数据血缘分析', path: '/metadata/lineage' },
-      { title: '数据字典管理' },
-      { title: '数据标准配置' },
-      { title: '数据脱敏管理' },
-      { title: '重复数据清洗' },
-    ],
-  },
-  {
-    key: 'asset',
-    title: '数据资产',
-    icon: 'DataBoard',
-    features: [
-      { title: '数据表资产', path: '/metadata/structure' },
-      { title: '指标资产', path: '/mart/metric' },
-      { title: '资产权限管理', path: '/permission/table' },
-      { title: '资产目录查询' },
-      { title: '标签资产' },
-      { title: '资产热度分析' },
-      { title: '资产检索' },
-    ],
-  },
-  {
-    key: 'service',
-    title: '数据服务',
-    icon: 'Share',
-    features: [
-      { title: '报表服务', path: '/visual/dashboard' },
-      { title: '自助取数', path: '/visual/adhoc' },
-      { title: '模型市场', path: '/mart/market' },
-      { title: '数据接口服务' },
-      { title: 'API 发布管理' },
-      { title: '数据共享服务' },
-      { title: '数据导出服务' },
-    ],
-  },
-  {
-    key: 'ops',
-    title: '监控运维',
-    icon: 'Monitor',
-    features: [
-      { title: '任务运行监控' },
-      { title: '数据告警中心', path: '/notification/send' },
-      { title: '日志查询' },
-      { title: '系统资源监控' },
-      { title: '权限管理', path: '/permission/table' },
-      { title: '用户管理', path: '/system/user' },
-      { title: '操作审计' },
-    ],
-  },
-]
+import { useModuleStore } from '@/stores/module'
+import { getUserPermission } from '@/api/permission'
+import type { CategoryDef } from '@/modules/registry'
 
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
+const moduleStore = useModuleStore()
+
+/** 六大分类模块（注册表 + 后端可插拔配置合并后的可见模块） */
+const categories = moduleStore.categories
+/** 系统管理分类 */
+const systemCategory = moduleStore.systemCategory
+/** 当前用户是否可配置门户模块 */
+const canConfig = moduleStore.canConfig
 
 const mapOpen = ref(false)
 const extraOpen = ref(false)
@@ -252,7 +161,7 @@ function go(path: string) {
   router.push(path)
 }
 
-function goModule(mod: Module) {
+function goModule(mod: CategoryDef) {
   const first = mod.features.find((f) => f.path)
   if (first?.path) {
     go(first.path)
@@ -270,8 +179,25 @@ async function handleCommand(command: string) {
     await ElMessageBox.confirm('确认退出登录吗？', '提示', { type: 'warning' })
     await userStore.logout()
     router.push('/login')
+  } else if (command === 'moduleConfig') {
+    router.push('/system/module-config')
   }
 }
+
+onMounted(async () => {
+  // 拉取用户能力位（用于判定 module:config 管理员权限），并加载可插拔模块配置
+  let capabilityFlags: string[] | undefined
+  try {
+    const userId = userStore.userInfo?.id
+    if (userId) {
+      const perm = await getUserPermission(userId)
+      capabilityFlags = perm?.capabilityFlags
+    }
+  } catch {
+    // 权限接口异常不阻塞门户渲染
+  }
+  await moduleStore.loadConfig(capabilityFlags)
+})
 </script>
 
 <style scoped>
@@ -419,6 +345,11 @@ async function handleCommand(command: string) {
   transition: all 0.18s;
 }
 .map-feature:hover {
+  background: linear-gradient(120deg, #7fb8e6, #165dff);
+  color: #fff;
+  border-color: transparent;
+}
+.map-feature.accent {
   background: linear-gradient(120deg, #7fb8e6, #165dff);
   color: #fff;
   border-color: transparent;

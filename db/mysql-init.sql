@@ -712,4 +712,84 @@ INSERT INTO notify_template (id, template_code, template_name, channel, title_te
 INSERT INTO visual_dashboard (id, name, description, refresh_interval, status, version, create_by) VALUES
 ('1', '平台总览', '平台运行指标总览', 60, 1, 0, '1');
 
+-- ============================================================
+-- 门户模块展示配置（可插拔模块）
+-- 说明：module_key 与前端模块注册表(registry.ts)一一对应；
+--       mandatory=1 为系统必须模块，管理员不可取消展示；
+--       visible=1 显示 / 0 隐藏。管理员可配置全局展示。
+-- ============================================================
+CREATE TABLE IF NOT EXISTS module_display_config (
+    module_key     VARCHAR(64)  NOT NULL PRIMARY KEY COMMENT '模块唯一标识',
+    module_name    VARCHAR(128) NOT NULL COMMENT '模块展示名称',
+    category       VARCHAR(32)  NOT NULL COMMENT '归属分类 ingress/dev/govern/asset/service/ops/system',
+    category_name  VARCHAR(64)  COMMENT '分类展示名',
+    icon           VARCHAR(64)  COMMENT '图标',
+    path           VARCHAR(200) COMMENT '路由路径（空=待建设）',
+    mandatory      TINYINT DEFAULT 0 COMMENT '1=系统必须，不可取消 0=可配置',
+    visible        TINYINT DEFAULT 1 COMMENT '1=显示 0=隐藏',
+    sort_order    INT DEFAULT 0 COMMENT '排序',
+    created_time   DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_time   DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    KEY idx_mdc_cat (category)
+) ENGINE=InnoDB COMMENT='门户模块展示配置表（可插拔模块开关）';
+
+-- 模块种子数据（与前端 registry.ts 保持一致；mandatory=1 为系统必须模块）
+INSERT INTO module_display_config (module_key, module_name, category, category_name, icon, path, mandatory, visible, sort_order) VALUES
+-- 数据接入
+('ds_list', '数据源管理', 'ingress', '数据接入', 'Connection', '/datasource/list', 1, 1, 1),
+('ds_conn', '数据库连接配置', 'ingress', '数据接入', 'Connection', '/datasource/list', 0, 1, 2),
+('ds_sync', '数据同步任务', 'ingress', '数据接入', NULL, NULL, 0, 1, 3),
+('ds_realtime', '实时数据接入', 'ingress', '数据接入', NULL, NULL, 0, 1, 4),
+('ds_offline', '离线数据采集', 'ingress', '数据接入', NULL, NULL, 0, 1, 5),
+('ds_api', '接口数据接入', 'ingress', '数据接入', NULL, NULL, 0, 1, 6),
+('ds_file', '文件数据导入', 'ingress', '数据接入', NULL, NULL, 0, 1, 7),
+-- 数据开发
+('dev_sql', 'SQL 开发编辑器', 'dev', '数据开发', 'EditPen', '/query/query', 1, 1, 1),
+('dev_schedule', '任务调度管理', 'dev', '数据开发', NULL, '/schedule/job', 0, 1, 2),
+('dev_cron', '定时任务配置', 'dev', '数据开发', NULL, '/schedule/job', 0, 1, 3),
+('dev_script', '数据脚本管理', 'dev', '数据开发', NULL, NULL, 0, 1, 4),
+('dev_workflow', '工作流编排', 'dev', '数据开发', NULL, NULL, 0, 1, 5),
+('dev_monitor', '任务监控', 'dev', '数据开发', NULL, NULL, 0, 1, 6),
+('dev_version', '脚本版本管理', 'dev', '数据开发', NULL, NULL, 0, 1, 7),
+-- 数据治理
+('gov_quality', '数据质量校验', 'govern', '数据治理', 'Odometer', '/dquality/rule', 0, 1, 1),
+('gov_meta', '元数据管理', 'govern', '数据治理', NULL, '/metadata/structure', 0, 1, 2),
+('gov_lineage', '数据血缘分析', 'govern', '数据治理', NULL, '/metadata/lineage', 0, 1, 3),
+('gov_dict', '数据字典管理', 'govern', '数据治理', NULL, NULL, 0, 1, 4),
+('gov_std', '数据标准配置', 'govern', '数据治理', NULL, NULL, 0, 1, 5),
+('gov_mask', '数据脱敏管理', 'govern', '数据治理', NULL, NULL, 0, 1, 6),
+('gov_dedup', '重复数据清洗', 'govern', '数据治理', NULL, NULL, 0, 1, 7),
+-- 数据资产
+('asset_table', '数据表资产', 'asset', '数据资产', NULL, '/metadata/structure', 0, 1, 1),
+('asset_metric', '指标资产', 'asset', '数据资产', NULL, '/mart/metric', 0, 1, 2),
+('asset_perm', '资产权限管理', 'asset', '数据资产', NULL, '/permission/table', 0, 1, 3),
+('asset_catalog', '资产目录查询', 'asset', '数据资产', NULL, NULL, 0, 1, 4),
+('asset_label', '标签资产', 'asset', '数据资产', NULL, NULL, 0, 1, 5),
+('asset_hot', '资产热度分析', 'asset', '数据资产', NULL, NULL, 0, 1, 6),
+('asset_search', '资产检索', 'asset', '数据资产', NULL, NULL, 0, 1, 7),
+-- 数据服务
+('svc_report', '报表服务', 'service', '数据服务', NULL, '/visual/dashboard', 0, 1, 1),
+('svc_adhoc', '自助取数', 'service', '数据服务', NULL, '/visual/adhoc', 0, 1, 2),
+('svc_market', '模型市场', 'service', '数据服务', NULL, '/mart/market', 0, 1, 3),
+('svc_api', '数据接口服务', 'service', '数据服务', NULL, NULL, 0, 1, 4),
+('svc_publish', 'API 发布管理', 'service', '数据服务', NULL, NULL, 0, 1, 5),
+('svc_share', '数据共享服务', 'service', '数据服务', NULL, NULL, 0, 1, 6),
+('svc_export', '数据导出服务', 'service', '数据服务', NULL, NULL, 0, 1, 7),
+-- 数据监控与运维
+('ops_monitor', '任务运行监控', 'ops', '监控运维', 'Monitor', NULL, 0, 1, 1),
+('ops_alert', '数据告警中心', 'ops', '监控运维', NULL, '/notification/send', 0, 1, 2),
+('ops_log', '日志查询', 'ops', '监控运维', NULL, NULL, 0, 1, 3),
+('ops_resource', '系统资源监控', 'ops', '监控运维', NULL, NULL, 0, 1, 4),
+('ops_perm', '权限管理', 'ops', '监控运维', NULL, '/permission/table', 0, 1, 5),
+('ops_user', '用户管理', 'ops', '监控运维', NULL, '/system/user', 0, 1, 6),
+('ops_audit', '操作审计', 'ops', '监控运维', NULL, NULL, 0, 1, 7),
+-- 系统管理
+('sys_user', '用户管理', 'system', '系统管理', 'User', '/system/user', 1, 1, 1),
+('sys_role', '角色管理', 'system', '系统管理', 'Avatar', '/system/role', 1, 1, 2),
+('sys_menu', '菜单管理', 'system', '系统管理', 'Menu', '/system/menu', 1, 1, 3),
+('sys_org', '组织管理', 'system', '系统管理', 'OfficeBuilding', '/system/org', 1, 1, 4),
+('sys_approval', '审批中心', 'system', '系统管理', NULL, '/approval/apply', 0, 1, 5),
+('sys_notify', '通知中心', 'system', '系统管理', NULL, '/notification/template', 0, 1, 6)
+ON DUPLICATE KEY UPDATE module_name = VALUES(module_name);
+
 SET FOREIGN_KEY_CHECKS = 1;

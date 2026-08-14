@@ -78,6 +78,13 @@ public class PermissionService {
             }
         }
         dto.setPermissions(perms);
+        // 超级管理员天然具备模块展示配置能力（即使无项目组上下文）
+        if (superAdmin && !perms.contains(com.datakhaos.permission.api.service.PermissionConstants.CAP_MODULE_CONFIG)) {
+            perms.add(com.datakhaos.permission.api.service.PermissionConstants.CAP_MODULE_CONFIG);
+        }
+        if (superAdmin && !dto.getCapabilityFlags().contains(com.datakhaos.permission.api.service.PermissionConstants.CAP_MODULE_CONFIG)) {
+            dto.getCapabilityFlags().add(com.datakhaos.permission.api.service.PermissionConstants.CAP_MODULE_CONFIG);
+        }
         return dto;
     }
 

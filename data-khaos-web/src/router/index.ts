@@ -46,6 +46,12 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/system/org/OrgList.vue'),
         meta: { title: '组织管理' },
       },
+      {
+        path: 'system/module-config',
+        name: 'ModuleConfig',
+        component: () => import('@/views/system/moduleconfig/ModuleConfigList.vue'),
+        meta: { title: '门户模块配置' },
+      },
       // 权限管理
       {
         path: 'permission/policy-row',
