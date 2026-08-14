@@ -38,7 +38,7 @@
       <div class="brand-content">
         <div class="brand-logo">
           <el-icon :size="26" color="#fff"><DataAnalysis /></el-icon>
-          <span class="brand-name">Data Khaos</span>
+          <span class="brand-name">Data-Khaos-Platform</span>
         </div>
         <h1 class="brand-title">数据治理平台</h1>
         <p class="brand-slogan">洞察数据 · 驱动决策</p>
@@ -96,7 +96,7 @@
           </el-form-item>
         </el-form>
 
-        <div class="form-copyright">© 2026 Data Khaos · 数据安全 · 权限可控</div>
+        <div class="form-copyright">© 2026 Data-Khaos-Platform · 数据安全 · 权限可控</div>
       </div>
     </div>
   </div>

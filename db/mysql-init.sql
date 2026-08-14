@@ -738,7 +738,7 @@ INSERT INTO module_display_config (module_key, module_name, category, category_n
 -- 数据接入
 ('ds_list', '数据源管理', 'ingress', '数据接入', 'Connection', '/datasource/list', 1, 1, 1),
 ('ds_conn', '数据库连接配置', 'ingress', '数据接入', 'Connection', '/datasource/list', 0, 1, 2),
-('ds_sync', '数据同步任务', 'ingress', '数据接入', NULL, NULL, 0, 1, 3),
+('ds_sync', '数据同步任务', 'ingress', '数据接入', 'DataLine', '/pipeline/task', 0, 1, 3),
 ('ds_realtime', '实时数据接入', 'ingress', '数据接入', NULL, NULL, 0, 1, 4),
 ('ds_offline', '离线数据采集', 'ingress', '数据接入', NULL, NULL, 0, 1, 5),
 ('ds_api', '接口数据接入', 'ingress', '数据接入', NULL, NULL, 0, 1, 6),
@@ -791,5 +791,62 @@ INSERT INTO module_display_config (module_key, module_name, category, category_n
 ('sys_approval', '审批中心', 'system', '系统管理', NULL, '/approval/apply', 0, 1, 5),
 ('sys_notify', '通知中心', 'system', '系统管理', NULL, '/notification/template', 0, 1, 6)
 ON DUPLICATE KEY UPDATE module_name = VALUES(module_name);
+
+-- ============================================================
+-- 数据管道（Data Pipeline）数据模型
+-- 说明：管理面负责任务/实例/worker 状态入库；执行面为独立引擎。
+-- ============================================================
+
+-- 管道任务定义表
+CREATE TABLE IF NOT EXISTS pipeline_task (
+    id            VARCHAR(32)  NOT NULL PRIMARY KEY COMMENT '主键ID',
+    task_name     VARCHAR(128) NOT NULL COMMENT '任务名称',
+    task_type     VARCHAR(32)  DEFAULT 'SYNC' COMMENT '任务类型 SYNC=同步 ETL=加工',
+    engine        VARCHAR(32)  DEFAULT 'DB_SYNC' COMMENT '执行引擎 DB_SYNC/DATAX/SEATUNNEL',
+    source_ds_id  VARCHAR(32)  COMMENT '源数据源ID',
+    source_table  VARCHAR(128) COMMENT '源表',
+    target_ds_id  VARCHAR(32)  COMMENT '目标数据源ID',
+    target_table  VARCHAR(128) COMMENT '目标表',
+    source_query  TEXT COMMENT '源查询(自定义SQL，选填)',
+    field_mapping TEXT COMMENT '字段映射(JSON，选填)',
+    config        TEXT COMMENT '引擎扩展配置(JSON)',
+    cron_expr     VARCHAR(64)  COMMENT '定时表达式(空=仅手动)',
+    status        TINYINT      DEFAULT 1 COMMENT '1=启用 0=停用',
+    create_by     VARCHAR(32)  COMMENT '创建人',
+    create_time   DATETIME     DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    update_time   DATETIME     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    KEY idx_pt_name (task_name),
+    KEY idx_pt_status (status)
+) ENGINE=InnoDB COMMENT='数据管道任务定义表';
+
+-- 管道执行实例表
+CREATE TABLE IF NOT EXISTS pipeline_instance (
+    id            VARCHAR(32)  NOT NULL PRIMARY KEY COMMENT '主键ID',
+    task_id       VARCHAR(32)  NOT NULL COMMENT '关联任务ID',
+    engine        VARCHAR(32)  COMMENT '执行引擎',
+    trigger_type  VARCHAR(16)  DEFAULT 'MANUAL' COMMENT '触发方式 MANUAL/CRON',
+    status        TINYINT      DEFAULT 0 COMMENT '0=运行中 1=成功 2=失败',
+    start_time    DATETIME     COMMENT '开始时间',
+    end_time      DATETIME     COMMENT '结束时间',
+    duration_ms   BIGINT       DEFAULT 0 COMMENT '耗时(毫秒)',
+    `rows`        BIGINT       DEFAULT 0 COMMENT '影响行数',
+    error_message TEXT         COMMENT '失败原因',
+    worker        VARCHAR(64)  COMMENT '执行worker标识',
+    create_time   DATETIME     DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    KEY idx_pi_task (task_id),
+    KEY idx_pi_status (status),
+    KEY idx_pi_start (start_time)
+) ENGINE=InnoDB COMMENT='数据管道执行实例表';
+
+-- 管道执行 worker 注册表（可扩展引擎执行节点）
+CREATE TABLE IF NOT EXISTS pipeline_worker (
+    id             VARCHAR(32)  NOT NULL PRIMARY KEY COMMENT '主键ID',
+    worker_name    VARCHAR(128) NOT NULL COMMENT 'worker名称/地址',
+    engines        VARCHAR(128) DEFAULT 'DB_SYNC' COMMENT '支持引擎，逗号分隔',
+    status         TINYINT      DEFAULT 0 COMMENT '1=在线 0=离线',
+    last_heartbeat DATETIME     COMMENT '最近心跳',
+    create_time    DATETIME     DEFAULT CURRENT_TIMESTAMP COMMENT '注册时间',
+    KEY idx_pw_status (status)
+) ENGINE=InnoDB COMMENT='数据管道worker注册表';
 
 SET FOREIGN_KEY_CHECKS = 1;

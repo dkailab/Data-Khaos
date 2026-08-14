@@ -93,8 +93,7 @@
           <el-input v-model="form.targetTable" placeholder="请输入目标表" />
         </el-form-item>
         <el-form-item label="参数(JSON)" prop="params">
-          <el-input v-model="form.params" type="textarea" :rows="2"
-            :placeholder="form.jobType === 'QUALITY' ? '质量任务ID，如 {\"taskId\": \"质量任务ID\"}' : '如 {\"batchSize\": 1000}'" />
+          <el-input v-model="form.params" type="textarea" :rows="2" :placeholder="paramsPlaceholder" />
         </el-form-item>
         <el-form-item label="失败重试次数" prop="retryCount">
           <el-input-number v-model="form.retryCount" :min="0" :max="10" />
@@ -154,7 +153,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 import { Plus, Refresh, Search } from '@element-plus/icons-vue'
@@ -163,6 +162,10 @@ import { createJob, deleteJob, pageJobLogs, pageJobs, runJob, startJob, stopJob,
 import type { ScheduleJob, ScheduleJobLog } from '@/types'
 
 const route = useRoute()
+
+const paramsPlaceholder = computed(() =>
+  form.jobType === 'QUALITY' ? '质量任务ID，如 {"taskId": "质量任务ID"}' : '如 {"batchSize": 1000}',
+)
 
 const jobTypes = [
   { label: '同步 SYNC', value: 'SYNC' },

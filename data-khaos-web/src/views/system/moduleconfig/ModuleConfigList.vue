@@ -52,7 +52,7 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Check, Refresh } from '@element-plus/icons-vue'
 import { getModuleConfigList, saveModuleConfig } from '@/api/moduleConfig'
-import { CATEGORIES, SYSTEM_CATEGORY, type CategoryDef } from '@/modules/registry'
+import { CATEGORIES, SYSTEM_CATEGORY } from '@/modules/registry'
 import type { ModuleDisplayConfig } from '@/types'
 
 const loading = ref(false)
@@ -63,7 +63,7 @@ const list = ref<ModuleDisplayConfig[]>([])
 const switchModel = reactive<Record<string, boolean>>({})
 
 /** 按注册表分类结构分组渲染（覆盖注册表里全部模块，含隐藏的以支持重新开启） */
-const grouped = computed<(CategoryDef & { features: ModuleDisplayConfig[] })[]>(() => {
+const grouped = computed(() => {
   const all = [...CATEGORIES, SYSTEM_CATEGORY]
   return all.map((cat) => ({
     ...cat,

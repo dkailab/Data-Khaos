@@ -48,6 +48,7 @@
         <module>data-khaos-schedule</module>
         <module>data-khaos-notification</module>
         <module>data-khaos-dquality</module>
+        <module>data-khaos-pipeline</module>
     </modules>
 
     <properties>

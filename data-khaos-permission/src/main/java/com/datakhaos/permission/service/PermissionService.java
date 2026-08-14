@@ -85,6 +85,22 @@ public class PermissionService {
         if (superAdmin && !dto.getCapabilityFlags().contains(com.datakhaos.permission.api.service.PermissionConstants.CAP_MODULE_CONFIG)) {
             dto.getCapabilityFlags().add(com.datakhaos.permission.api.service.PermissionConstants.CAP_MODULE_CONFIG);
         }
+        // 超级管理员天然具备数据管道能力位
+        String[] pipelineCaps = {
+                com.datakhaos.permission.api.service.PermissionConstants.CAP_PIPELINE_MANAGE,
+                com.datakhaos.permission.api.service.PermissionConstants.CAP_PIPELINE_BROWSE,
+                com.datakhaos.permission.api.service.PermissionConstants.CAP_PIPELINE_RUN
+        };
+        if (superAdmin) {
+            for (String cap : pipelineCaps) {
+                if (!perms.contains(cap)) {
+                    perms.add(cap);
+                }
+                if (!dto.getCapabilityFlags().contains(cap)) {
+                    dto.getCapabilityFlags().add(cap);
+                }
+            }
+        }
         return dto;
     }
 

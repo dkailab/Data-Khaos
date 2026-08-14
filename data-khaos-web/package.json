@@ -2,7 +2,7 @@
   "name": "data-khaos-web",
   "version": "1.0.0",
   "private": true,
-  "description": "Data Khaos 数据治理平台前端",
+  "description": "Data-Khaos-Platform 数据治理平台前端",
   "engines": {
     "node": ">=18.0.0"
   },

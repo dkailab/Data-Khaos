@@ -783,6 +783,56 @@ export interface NotifySubscription {
   createTime?: string
 }
 
+/* ==================== 数据管道 ==================== */
+
+export interface PipelineTask {
+  id?: string
+  taskName?: string
+  /** SYNC=同步 ETL=加工 */
+  taskType?: string
+  /** 执行引擎 DB_SYNC/DATAX/SEATUNNEL */
+  engine?: string
+  sourceDsId?: string
+  sourceTable?: string
+  targetDsId?: string
+  targetTable?: string
+  /** 源查询（自定义 SQL，选填） */
+  sourceQuery?: string
+  /** 字段映射（JSON，选填） */
+  fieldMapping?: string
+  /** 引擎扩展配置（JSON） */
+  config?: string
+  /** 定时表达式（空=仅手动） */
+  cronExpr?: string
+  /** 1=启用 0=停用 */
+  status?: number
+  createBy?: string
+  createTime?: string
+  updateTime?: string
+}
+
+export interface PipelineEngineInfo {
+  type: string
+  name: string
+  available: boolean
+}
+
+export interface PipelineInstance {
+  id?: string
+  taskId?: string
+  engine?: string
+  /** MANUAL / CRON */
+  triggerType?: string
+  /** 0=运行中 1=成功 2=失败 */
+  status?: number
+  startTime?: string
+  endTime?: string
+  durationMs?: number
+  rows?: number
+  errorMessage?: string
+  worker?: string
+}
+
 /* ==================== 门户可插拔模块配置 ==================== */
 
 /** 模块归属分类（与后端 / 前端注册表一致） */

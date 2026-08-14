@@ -4,7 +4,7 @@
       <div class="welcome">
         <div>
           <h2>欢迎回来，{{ userStore.userInfo?.realName || userStore.userInfo?.username || '用户' }}</h2>
-          <p>这里是 Data Khaos 数据治理平台，一站式管理数据源、元数据、数据集市与数据权限。</p>
+          <p>这里是 Data-Khaos-Platform 数据治理平台，一站式管理数据源、元数据、数据集市与数据权限。</p>
         </div>
         <el-button type="primary" @click="router.push('/query/query')">前往 SQL 查询</el-button>
       </div>

@@ -5,7 +5,7 @@
       <div class="nav-inner">
         <div class="nav-logo" @click="router.push('/dashboard')">
           <el-icon :size="24" color="#fff"><DataAnalysis /></el-icon>
-          <span class="nav-logo-text">Data Khaos</span>
+          <span class="nav-logo-text">Data-Khaos-Platform</span>
         </div>
 
         <nav class="nav-menu">

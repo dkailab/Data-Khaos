@@ -35,6 +35,7 @@ COPY data-khaos-visual/       ./data-khaos-visual/
 COPY data-khaos-schedule/     ./data-khaos-schedule/
 COPY data-khaos-notification/ ./data-khaos-notification/
 COPY data-khaos-dquality/     ./data-khaos-dquality/
+COPY data-khaos-pipeline/     ./data-khaos-pipeline/
 
 RUN mvn -q -B -DskipTests clean package
 

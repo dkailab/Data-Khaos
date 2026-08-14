@@ -1,0 +1,109 @@
+package com.datakhaos.pipeline.service;
+
+import cn.hutool.core.util.StrUtil;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.datakhaos.common.exception.BusinessException;
+import com.datakhaos.common.model.PageResult;
+import com.datakhaos.common.security.MetadataHolder;
+import com.datakhaos.pipeline.engine.EngineFactory;
+import com.datakhaos.pipeline.entity.PipelineInstance;
+import com.datakhaos.pipeline.entity.PipelineTask;
+import com.datakhaos.pipeline.mapper.PipelineTaskMapper;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+import java.util.Map;
+
+/**
+ * 管道任务服务：CRUD + 手动/定时触发。
+ */
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class PipelineTaskService {
+
+    private final PipelineTaskMapper mapper;
+    private final PipelineRunner runner;
+    private final EngineFactory engineFactory;
+    private final @Qualifier("pipelineTaskExecutor") ThreadPoolTaskExecutor executor;
+
+    /** 分页查询任务 */
+    public PageResult<PipelineTask> page(long current, long size, String keyword, String engine) {
+        LambdaQueryWrapper<PipelineTask> wrapper = new LambdaQueryWrapper<PipelineTask>()
+                .like(StrUtil.isNotBlank(keyword), PipelineTask::getTaskName, keyword)
+                .eq(StrUtil.isNotBlank(engine), PipelineTask::getEngine, engine)
+                .orderByDesc(PipelineTask::getCreateTime);
+        Page<PipelineTask> page = mapper.selectPage(new Page<>(current, size), wrapper);
+        return PageResult.of(page.getCurrent(), page.getSize(), page.getTotal(), page.getRecords());
+    }
+
+    public PipelineTask get(String id) {
+        PipelineTask task = mapper.selectById(id);
+        if (task == null) {
+            throw new BusinessException("管道任务不存在: " + id);
+        }
+        return task;
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public void create(PipelineTask task) {
+        validate(task);
+        task.setId(null);
+        if (task.getStatus() == null) {
+            task.setStatus(1);
+        }
+        task.setCreateBy(MetadataHolder.getUserId());
+        mapper.insert(task);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public void update(PipelineTask task) {
+        if (StrUtil.isBlank(task.getId())) {
+            throw new BusinessException("任务 ID 不能为空");
+        }
+        PipelineTask exist = get(task.getId());
+        if (StrUtil.isBlank(task.getTaskName())) {
+            task.setTaskName(exist.getTaskName());
+        }
+        mapper.updateById(task);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public void delete(String id) {
+        get(id);
+        mapper.deleteById(id);
+    }
+
+    /** 引擎列表（可扩展） */
+    public List<Map<String, Object>> engines() {
+        return engineFactory.list();
+    }
+
+    /** 手动触发运行 */
+    public PipelineInstance run(String taskId) {
+        PipelineTask task = get(taskId);
+        if (task.getStatus() == null || task.getStatus() != 1) {
+            throw new BusinessException("任务已停用，请先启用");
+        }
+        PipelineInstance instance = runner.createInstance(task, "MANUAL");
+        executor.execute(() -> runner.execute(task, instance));
+        return instance;
+    }
+
+    private void validate(PipelineTask task) {
+        if (StrUtil.isBlank(task.getTaskName())) {
+            throw new BusinessException("任务名称不能为空");
+        }
+        if (StrUtil.isBlank(task.getEngine())) {
+            task.setEngine("DB_SYNC");
+        }
+        // 校验引擎受支持
+        engineFactory.get(task.getEngine());
+    }
+}

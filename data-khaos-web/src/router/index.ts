@@ -91,6 +91,13 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/datasource/list/DatasourceList.vue'),
         meta: { title: '数据源列表' },
       },
+      // 数据管道
+      {
+        path: 'pipeline/task',
+        name: 'PipelineTask',
+        component: () => import('@/views/pipeline/task/TaskList.vue'),
+        meta: { title: '数据同步任务' },
+      },
       // 元数据中心
       {
         path: 'metadata/structure',
@@ -237,7 +244,7 @@ router.beforeEach((to, _from, next) => {
 
 router.afterEach((to) => {
   const title = to.meta?.title as string | undefined
-  document.title = title ? `${title} - Data Khaos 数据治理平台` : 'Data Khaos 数据治理平台'
+  document.title = title ? `${title} - Data-Khaos-Platform 数据治理平台` : 'Data-Khaos-Platform 数据治理平台'
 })
 
 export default router

@@ -248,6 +248,18 @@ services:
     ports:
       - "8091:8091"
 
+  # ---------- 数据管道 ----------
+  pipeline:
+    <<: *app-common
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      args:
+        MODULE: data-khaos-pipeline
+    container_name: dk-pipeline
+    ports:
+      - "8092:8092"
+
 volumes:
   mysql-data:
   redis-data:

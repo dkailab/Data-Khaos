@@ -36,6 +36,11 @@ public interface PermissionConstants {
     /** 门户模块展示配置能力位（管理员级，全局模块可插拔配置） */
     String CAP_MODULE_CONFIG = "module:config";
 
+    /** 数据管道能力位（数据接入能力域） */
+    String CAP_PIPELINE_MANAGE = "pipeline:manage";
+    String CAP_PIPELINE_BROWSE = "pipeline:browse";
+    String CAP_PIPELINE_RUN = "pipeline:run";
+
     String PERM_SQL_EXECUTE = "query:sql:execute";
     String PERM_DASHBOARD_VIEW = "query:dashboard:view";
     String PERM_ANALYSIS_VIEW = "query:analysis:view";

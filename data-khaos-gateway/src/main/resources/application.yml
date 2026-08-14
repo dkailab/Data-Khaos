@@ -65,6 +65,10 @@ spring:
           uri: lb://data-khaos-dquality
           predicates:
             - Path=/api/dquality/**
+        - id: data-khaos-pipeline
+          uri: lb://data-khaos-pipeline
+          predicates:
+            - Path=/api/pipeline/**
       globalcors:
         cors-configurations:
           '[/**]':
