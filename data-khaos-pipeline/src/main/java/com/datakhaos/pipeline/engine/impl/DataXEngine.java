@@ -59,8 +59,9 @@ public class DataXEngine implements PipelineEngine {
 
     @Override
     public String buildRunConfig(PipelineTask task) {
+        String st = sourceType(task);
         return JSONUtil.toJsonStr(Map.of(
-                "job_type", "MYSQL_TO_MYSQL",
+                "job_type", "HIVE".equalsIgnoreCase(st) ? "HIVE_TO_MYSQL" : "MYSQL_TO_MYSQL",
                 "source_table", task.getSourceTable(),
                 "target_table", task.getTargetTable()));
     }
@@ -77,7 +78,14 @@ public class DataXEngine implements PipelineEngine {
         }
         Map<String, Object> source = EngineUtils.getDs(jdbcTemplate, task.getSourceDsId());
         Map<String, Object> target = EngineUtils.getDs(jdbcTemplate, task.getTargetDsId());
-        EngineUtils.checkMysql(source, target);
+        String st = String.valueOf(source.get("ds_type")).toUpperCase();
+        String tt = String.valueOf(target.get("ds_type")).toUpperCase();
+        if (!"MYSQL".equals(tt)) {
+            throw new BusinessException("DataX hive2mysql 目标当前仅支持 MySQL（" + st + "→" + tt + "）");
+        }
+        if (!"MYSQL".equals(st) && !"HIVE".equals(st)) {
+            throw new BusinessException("DataX 引擎当前支持 MySQL/Hive 源（" + st + "→" + tt + "），其他类型请扩展 DataX Reader 适配器");
+        }
 
         // 1. 渲染 job.json
         String jobJson = renderJobJson(task, source, target);
@@ -108,22 +116,16 @@ public class DataXEngine implements PipelineEngine {
         return 0;
     }
 
-    /** 渲染 MySQL → MySQL 的 DataX job.json（reader 全表 / writer replace 写入） */
-    private String renderJobJson(PipelineTask task, Map<String, Object> source, Map<String, Object> target) {
-        String sourceSql = StrUtil.isNotBlank(task.getSourceQuery())
-                ? task.getSourceQuery().trim()
-                : "select * from `" + task.getSourceTable() + "`";
+    private String sourceType(PipelineTask task) {
+        return EngineUtils.getDs(jdbcTemplate, task.getSourceDsId()).get("ds_type").toString();
+    }
 
-        JSONObject reader = new JSONObject();
-        reader.set("name", "mysqlreader");
-        JSONObject readerParam = new JSONObject();
-        readerParam.set("username", source.get("username"));
-        readerParam.set("password", EngineUtils.decryptPwd(String.valueOf(source.get("password")), aesKey));
-        readerParam.set("column", new String[]{"*"});
-        readerParam.set("connection", new Object[]{new JSONObject()
-                .set("jdbcUrl", new String[]{EngineUtils.jdbcUrl(source)})
-                .set("querySql", new String[]{sourceSql})});
-        reader.set("parameter", readerParam);
+    /** 渲染 DataX job.json：Hive 源用 hdfsreader（读 Hive 表 HDFS 落地文件），MySQL 源用 mysqlreader；writer 均为 mysqlwriter */
+    private String renderJobJson(PipelineTask task, Map<String, Object> source, Map<String, Object> target) {
+        String st = String.valueOf(source.get("ds_type")).toUpperCase();
+        JSONObject reader = "HIVE".equalsIgnoreCase(st)
+                ? buildHiveReader(task)
+                : buildMysqlReader(task, source);
 
         JSONObject writer = new JSONObject();
         writer.set("name", "mysqlwriter");
@@ -147,5 +149,47 @@ public class DataXEngine implements PipelineEngine {
                 .set("speed", new JSONObject().set("channel", 1))
                 .set("errorLimit", new JSONObject().set("record", 0)));
         return JSONUtil.toJsonPrettyStr(job);
+    }
+
+    /** Hive → DataX hdfsreader：读取 Hive 表在 HDFS 上的落地文件（文本分隔符可配置） */
+    private JSONObject buildHiveReader(PipelineTask task) {
+        String hdfsPath = cn.hutool.json.JSONUtil.parseObj(task.getConfig() == null ? "{}" : task.getConfig())
+                .getStr("hdfsPath", "hdfs://localhost:9000/user/hive/warehouse/" + task.getSourceTable() + "/*");
+        // 表名可能为 库.表，落到 /user/hive/warehouse/库.db/表
+        String table = task.getSourceTable();
+        if (StrUtil.isNotBlank(table) && table.contains(".")) {
+            String db = table.substring(0, table.lastIndexOf('.'));
+            String t = table.substring(table.lastIndexOf('.') + 1);
+            hdfsPath = "hdfs://localhost:9000/user/hive/warehouse/" + db + ".db/" + t + "/*";
+        }
+        JSONObject reader = new JSONObject();
+        reader.set("name", "hdfsreader");
+        JSONObject param = new JSONObject();
+        param.set("path", hdfsPath);
+        param.set("defaultFS", "hdfs://localhost:9000");
+        param.set("fileType", "text");
+        param.set("fieldDelimiter", "\t");
+        param.set("encoding", "UTF-8");
+        param.set("column", new Object[]{new JSONObject().set("type", "string")});
+        reader.set("parameter", param);
+        return reader;
+    }
+
+    /** MySQL → DataX mysqlreader：全表 / 自定义 SQL */
+    private JSONObject buildMysqlReader(PipelineTask task, Map<String, Object> source) {
+        String sourceSql = StrUtil.isNotBlank(task.getSourceQuery())
+                ? task.getSourceQuery().trim()
+                : "select * from `" + task.getSourceTable() + "`";
+        JSONObject reader = new JSONObject();
+        reader.set("name", "mysqlreader");
+        JSONObject readerParam = new JSONObject();
+        readerParam.set("username", source.get("username"));
+        readerParam.set("password", EngineUtils.decryptPwd(String.valueOf(source.get("password")), aesKey));
+        readerParam.set("column", new String[]{"*"});
+        readerParam.set("connection", new Object[]{new JSONObject()
+                .set("jdbcUrl", new String[]{EngineUtils.jdbcUrl(source)})
+                .set("querySql", new String[]{sourceSql})});
+        reader.set("parameter", readerParam);
+        return reader;
     }
 }

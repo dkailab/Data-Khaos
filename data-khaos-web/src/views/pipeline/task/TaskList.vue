@@ -1,5 +1,5 @@
 <template>
-  <el-card shadow="never">
+  <el-card shadow="never" class="pipeline-page">
     <div class="toolbar">
       <el-form inline>
         <el-form-item label="关键字">
@@ -21,7 +21,7 @@
           <el-button :icon="Refresh" @click="handleReset">重置</el-button>
         </el-form-item>
       </el-form>
-      <el-button type="primary" :icon="Plus" @click="openCreate">新增任务</el-button>
+      <el-button type="primary" :icon="Plus" @click="openCreate">新建同步任务</el-button>
     </div>
 
     <el-table v-loading="loading" :data="list" border stripe>
@@ -76,62 +76,146 @@
       @change="load"
     />
 
-    <!-- 新增 / 编辑任务 -->
-    <el-dialog v-model="dialogVisible" :title="isEdit ? '编辑任务' : '新增任务'" width="680px" destroy-on-close>
-      <el-form ref="formRef" :model="form" :rules="formRules" label-width="110px">
-        <el-form-item label="任务名称" prop="taskName">
-          <el-input v-model="form.taskName" placeholder="请输入任务名称" />
-        </el-form-item>
-        <el-form-item label="任务类型" prop="taskType">
-          <el-select v-model="form.taskType" style="width: 100%">
-            <el-option label="同步 SYNC" value="SYNC" />
-            <el-option label="加工 ETL" value="ETL" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="执行引擎" prop="engine">
-          <el-select v-model="form.engine" style="width: 100%">
-            <el-option v-for="e in engineOptions" :key="e.type" :value="e.type" :label="`${e.name}${e.available ? '' : '（未安装）'}`" />
-          </el-select>
-          <div class="tip">DB-Sync 为内置兜底引擎始终可用；DataX / SeaTunnel 需在引擎环境安装对应 CLI。</div>
-        </el-form-item>
-        <el-form-item label="源数据源" prop="sourceDsId">
-          <el-select v-model="form.sourceDsId" filterable style="width: 100%">
-            <el-option v-for="d in dsOptions" :key="d.id" :value="d.id" :label="`${d.dsName}（${d.dsType}）`" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="源表" prop="sourceTable">
-          <el-input v-model="form.sourceTable" placeholder="源表名" />
-        </el-form-item>
-        <el-form-item label="目标数据源" prop="targetDsId">
-          <el-select v-model="form.targetDsId" filterable style="width: 100%">
-            <el-option v-for="d in dsOptions" :key="d.id" :value="d.id" :label="`${d.dsName}（${d.dsType}）`" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="目标表" prop="targetTable">
-          <el-input v-model="form.targetTable" placeholder="目标表名" />
-        </el-form-item>
-        <el-form-item label="源查询(SQL)">
-          <el-input v-model="form.sourceQuery" type="textarea" :rows="2" placeholder="缺省为 SELECT * FROM 源表（可选）" />
-        </el-form-item>
-        <el-form-item label="字段映射">
-          <el-input v-model="form.fieldMapping" type="textarea" :rows="2" placeholder='JSON，如 {"col_a":"col_b"}（可选）' />
-        </el-form-item>
-        <el-form-item label="Cron 表达式">
-          <el-input v-model="form.cronExpr" placeholder="如 0 0 2 * * ?（空=仅手动）" />
-        </el-form-item>
-        <el-form-item label="引擎配置">
-          <el-input v-model="form.config" type="textarea" :rows="2" placeholder='JSON，如 {"timeoutSeconds":3600}（可选）' />
-        </el-form-item>
-        <el-form-item label="状态">
-          <el-radio-group v-model="form.status">
-            <el-radio :value="1">启用</el-radio>
-            <el-radio :value="0">停用</el-radio>
-          </el-radio-group>
-        </el-form-item>
-      </el-form>
+    <!-- ============ 新建 / 编辑：分步向导 ============ -->
+    <el-dialog
+      v-model="wizardVisible"
+      :title="isEdit ? '编辑同步任务' : '新建同步任务'"
+      width="920px"
+      destroy-on-close
+      class="dk-wizard"
+      align-center
+    >
+      <div class="wizard-header">
+        <div class="wh-title">{{ isEdit ? '编辑同步任务' : '配置数据同步' }}</div>
+        <div class="wh-sub">源数据 → 同步引擎 → 目标数据，三步完成离线同步</div>
+      </div>
+
+      <el-steps :active="wizardStep" align-center finish-status="success" class="wizard-steps">
+        <el-step title="数据源" :description="sourceType ? dbTypeText(sourceType) : '选择源类型'" />
+        <el-step title="去向" :description="targetType ? dbTypeText(targetType) : '选择目标类型'" />
+        <el-step title="同步工具" :description="wizardForm.engine ? engineText(wizardForm.engine) : '选择引擎'" />
+        <el-step title="参数" description="运行参数与调度" />
+      </el-steps>
+
+      <!-- 步骤1：数据源 -->
+      <div v-show="wizardStep === 0" class="wizard-panel">
+        <div class="panel-label">第一步 · 选择数据源（源）</div>
+        <div class="type-cards">
+          <div
+            v-for="t in dbTypes"
+            :key="t.value"
+            class="type-card"
+            :class="{ active: sourceType === t.value }"
+            @click="selectSourceType(t.value)"
+          >
+            <el-icon class="tc-icon" :style="{ color: t.color }"><component :is="t.icon" /></el-icon>
+            <div class="tc-name">{{ t.label }}</div>
+          </div>
+        </div>
+        <el-form :model="wizardForm" label-width="90px" class="panel-form">
+          <el-form-item label="源数据源">
+            <el-select v-model="wizardForm.sourceDsId" filterable placeholder="选择源数据源" style="width: 100%">
+              <el-option v-for="d in sourceDsOptions" :key="d.id" :value="d.id" :label="`${d.dsName}（${d.host}:${d.port}）`" />
+            </el-select>
+          </el-form-item>
+          <el-form-item label="源表">
+            <el-input v-model="wizardForm.sourceTable" placeholder="源表名 / Hive 表（库.表）" />
+          </el-form-item>
+        </el-form>
+      </div>
+
+      <!-- 步骤2：去向 -->
+      <div v-show="wizardStep === 1" class="wizard-panel">
+        <div class="panel-label">第二步 · 选择数据去向（目标）</div>
+        <div class="type-cards">
+          <div
+            v-for="t in dbTypes"
+            :key="t.value"
+            class="type-card"
+            :class="{ active: targetType === t.value }"
+            @click="selectTargetType(t.value)"
+          >
+            <el-icon class="tc-icon" :style="{ color: t.color }"><component :is="t.icon" /></el-icon>
+            <div class="tc-name">{{ t.label }}</div>
+          </div>
+        </div>
+        <el-form :model="wizardForm" label-width="90px" class="panel-form">
+          <el-form-item label="目标数据源">
+            <el-select v-model="wizardForm.targetDsId" filterable placeholder="选择目标数据源" style="width: 100%">
+              <el-option v-for="d in targetDsOptions" :key="d.id" :value="d.id" :label="`${d.dsName}（${d.host}:${d.port}）`" />
+            </el-select>
+          </el-form-item>
+          <el-form-item label="目标表">
+            <el-input v-model="wizardForm.targetTable" placeholder="目标表名" />
+          </el-form-item>
+        </el-form>
+      </div>
+
+      <!-- 步骤3：同步工具 -->
+      <div v-show="wizardStep === 2" class="wizard-panel">
+        <div class="panel-label">第三步 · 选择同步工具</div>
+        <div class="engine-cards">
+          <div
+            v-for="e in engineOptions"
+            :key="e.type"
+            class="engine-card"
+            :class="{ active: wizardForm.engine === e.type }"
+            @click="wizardForm.engine = e.type"
+          >
+            <el-icon class="ec-icon" :style="{ color: engineColor(e.type) }"><component :is="engineIcon(e.type)" /></el-icon>
+            <div class="ec-name">{{ e.name }}</div>
+            <div class="ec-desc">{{ engineDesc(e.type) }}</div>
+            <el-tag :type="e.available ? 'success' : 'info'" size="small" class="ec-tag">
+              {{ e.available ? '可用' : '未安装' }}
+            </el-tag>
+          </div>
+        </div>
+        <div class="tip">DB-Sync 为内置兜底引擎始终可用；DataX / SeaTunnel 需在引擎环境安装对应 CLI。</div>
+      </div>
+
+      <!-- 步骤4：参数 -->
+      <div v-show="wizardStep === 3" class="wizard-panel">
+        <div class="panel-label">第四步 · 运行参数与调度</div>
+        <el-form ref="formRef" :model="wizardForm" :rules="formRules" label-width="110px" class="panel-form">
+          <el-form-item label="任务名称" prop="taskName">
+            <el-input v-model="wizardForm.taskName" placeholder="请输入任务名称" />
+          </el-form-item>
+          <el-form-item label="任务类型" prop="taskType">
+            <el-radio-group v-model="wizardForm.taskType">
+              <el-radio-button value="SYNC">同步 SYNC</el-radio-button>
+              <el-radio-button value="ETL">加工 ETL</el-radio-button>
+            </el-radio-group>
+          </el-form-item>
+          <el-form-item label="源查询(SQL)">
+            <el-input v-model="wizardForm.sourceQuery" type="textarea" :rows="2" placeholder="缺省为 SELECT * FROM 源表（可选）" />
+          </el-form-item>
+          <el-form-item label="字段映射">
+            <el-input v-model="wizardForm.fieldMapping" type="textarea" :rows="2" placeholder='JSON，如 {"col_a":"col_b"}（可选）' />
+          </el-form-item>
+          <el-form-item label="Cron 表达式">
+            <el-input v-model="wizardForm.cronExpr" placeholder="如 0 0 2 * * ?（空=仅手动）" />
+          </el-form-item>
+          <el-form-item label="引擎配置">
+            <el-input v-model="wizardForm.config" type="textarea" :rows="2" placeholder='JSON，如 {"timeoutSeconds":3600}（可选）' />
+          </el-form-item>
+          <el-form-item label="状态">
+            <el-radio-group v-model="wizardForm.status">
+              <el-radio :value="1">启用</el-radio>
+              <el-radio :value="0">停用</el-radio>
+            </el-radio-group>
+          </el-form-item>
+        </el-form>
+      </div>
+
       <template #footer>
-        <el-button @click="dialogVisible = false">取消</el-button>
-        <el-button type="primary" :loading="submitting" @click="submit">保存</el-button>
+        <div class="wizard-footer">
+          <el-button v-if="wizardStep > 0" @click="wizardStep--">上一步</el-button>
+          <el-button v-if="wizardStep < 3" type="primary" @click="nextStep">下一步</el-button>
+          <template v-else>
+            <el-button @click="wizardVisible = false">取消</el-button>
+            <el-button type="primary" :loading="submitting" @click="submit">保存任务</el-button>
+          </template>
+        </div>
       </template>
     </el-dialog>
 
@@ -160,10 +244,24 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
-import { Plus, Refresh, Search } from '@element-plus/icons-vue'
+import {
+  Coin,
+  Connection,
+  DataLine,
+  Document,
+  Files,
+  Grid,
+  MagicStick,
+  Odometer,
+  Plus,
+  Refresh,
+  Search,
+  Setting,
+  Timer,
+} from '@element-plus/icons-vue'
 import {
   createPipelineTask,
   deletePipelineTask,
@@ -183,17 +281,28 @@ const list = ref<PipelineTask[]>([])
 const total = ref(0)
 const query = reactive<Record<string, any>>({ current: 1, size: 10, keyword: '', engine: undefined, status: undefined })
 
-const dialogVisible = ref(false)
-const formRef = ref<FormInstance>()
+const wizardVisible = ref(false)
 const isEdit = ref(false)
-const form = reactive<PipelineTask>({ taskName: '', taskType: 'SYNC', engine: 'DB_SYNC', status: 1 })
+const wizardStep = ref(0)
+const formRef = ref<FormInstance>()
+const sourceType = ref<string>('MYSQL')
+const targetType = ref<string>('MYSQL')
+const wizardForm = reactive<PipelineTask>({ taskName: '', taskType: 'SYNC', engine: 'DB_SYNC', status: 1 })
+
 const formRules: FormRules = {
   taskName: [{ required: true, message: '请输入任务名称', trigger: 'blur' }],
-  sourceDsId: [{ required: true, message: '请选择源数据源', trigger: 'change' }],
-  sourceTable: [{ required: true, message: '请输入源表', trigger: 'blur' }],
-  targetDsId: [{ required: true, message: '请选择目标数据源', trigger: 'change' }],
-  targetTable: [{ required: true, message: '请输入目标表', trigger: 'blur' }],
 }
+
+const dbTypes = computed(() => [
+  { label: 'MySQL', value: 'MYSQL', icon: Grid, color: '#f7941d' },
+  { label: 'Hive', value: 'HIVE', icon: Coin, color: '#fbbf24' },
+  { label: 'PostgreSQL', value: 'POSTGRESQL', icon: Connection, color: '#336791' },
+  { label: 'Doris', value: 'DORIS', icon: Odometer, color: '#3b82f6' },
+  { label: 'ClickHouse', value: 'CLICKHOUSE', icon: Files, color: '#f9c74f' },
+  { label: 'Oracle', value: 'ORACLE', icon: Document, color: '#e11d48' },
+  { label: 'DM8', value: 'DM8', icon: DataLine, color: '#7c3aed' },
+  { label: 'Transwarp', value: 'TRANSWARP', icon: MagicStick, color: '#0ea5e9' },
+])
 
 const engineOptions = ref<PipelineEngineInfo[]>([])
 const dsOptions = ref<MetaDatasource[]>([])
@@ -202,6 +311,13 @@ const instanceVisible = ref(false)
 const instanceLoading = ref(false)
 const instances = ref<PipelineInstance[]>([])
 const currentTask = ref<PipelineTask>()
+
+const sourceDsOptions = computed(() => dsOptions.value.filter((d) => d.dsType === sourceType.value))
+const targetDsOptions = computed(() => dsOptions.value.filter((d) => d.dsType === targetType.value))
+
+function dbTypeText(t?: string) {
+  return dbTypes.value.find((d) => d.value === t)?.label ?? t ?? ''
+}
 
 function taskTypeText(t?: string) {
   return { SYNC: '同步', ETL: '加工' }[t ?? ''] ?? t ?? '-'
@@ -215,6 +331,27 @@ function engineTagType(t?: string): 'success' | 'warning' | 'info' {
   if (t === 'DB_SYNC') return 'success'
   if (t === 'DATAX' || t === 'SEATUNNEL') return 'warning'
   return 'info'
+}
+
+function engineIcon(t?: string) {
+  if (t === 'DATAX') return Odometer
+  if (t === 'SEATUNNEL') return Coin
+  if (t === 'DB_SYNC') return Setting
+  return DataLine
+}
+
+function engineColor(t?: string) {
+  if (t === 'DATAX') return '#f7941d'
+  if (t === 'SEATUNNEL') return '#0ea5e9'
+  if (t === 'DB_SYNC') return '#10b981'
+  return '#6b7280'
+}
+
+function engineDesc(t?: string) {
+  if (t === 'DB_SYNC') return '内置 JDBC 直连，轻量兜底'
+  if (t === 'DATAX') return '阿里开源，离线高吞吐'
+  if (t === 'SEATUNNEL') return 'Apache 开源，流批一体'
+  return ''
 }
 
 function instanceText(s?: number) {
@@ -268,29 +405,60 @@ function handleReset() {
   handleSearch()
 }
 
+function selectSourceType(t: string) {
+  sourceType.value = t
+  wizardForm.sourceDsId = ''
+}
+function selectTargetType(t: string) {
+  targetType.value = t
+  wizardForm.targetDsId = ''
+}
+
 function openCreate() {
   isEdit.value = false
-  Object.assign(form, { taskName: '', taskType: 'SYNC', engine: 'DB_SYNC', sourceDsId: '', sourceTable: '', targetDsId: '', targetTable: '', sourceQuery: '', fieldMapping: '', config: '', cronExpr: '', status: 1 })
-  dialogVisible.value = true
+  wizardStep.value = 0
+  sourceType.value = 'MYSQL'
+  targetType.value = 'MYSQL'
+  Object.assign(wizardForm, { taskName: '', taskType: 'SYNC', engine: 'DB_SYNC', sourceDsId: '', sourceTable: '', targetDsId: '', targetTable: '', sourceQuery: '', fieldMapping: '', config: '', cronExpr: '', status: 1 })
+  wizardVisible.value = true
 }
 
 function openEdit(row: PipelineTask) {
   isEdit.value = true
-  Object.assign(form, { ...row })
-  dialogVisible.value = true
+  wizardStep.value = 0
+  Object.assign(wizardForm, { ...row })
+  const src = dsOptions.value.find((d) => d.id === row.sourceDsId)
+  const tgt = dsOptions.value.find((d) => d.id === row.targetDsId)
+  sourceType.value = src?.dsType || 'MYSQL'
+  targetType.value = tgt?.dsType || 'MYSQL'
+  wizardVisible.value = true
+}
+
+function nextStep() {
+  if (wizardStep.value === 0) {
+    if (!wizardForm.sourceDsId) return ElMessage.warning('请选择源数据源')
+    if (!wizardForm.sourceTable) return ElMessage.warning('请输入源表')
+  } else if (wizardStep.value === 1) {
+    if (!wizardForm.targetDsId) return ElMessage.warning('请选择目标数据源')
+    if (!wizardForm.targetTable) return ElMessage.warning('请输入目标表')
+  } else if (wizardStep.value === 2) {
+    if (!wizardForm.engine) return ElMessage.warning('请选择同步工具')
+  }
+  wizardStep.value++
 }
 
 async function submit() {
   await formRef.value?.validate()
   submitting.value = true
   try {
+    const payload = { ...wizardForm } as PipelineTask
     if (isEdit.value) {
-      await updatePipelineTask({ ...form })
+      await updatePipelineTask(payload)
     } else {
-      await createPipelineTask({ ...form })
+      await createPipelineTask(payload)
     }
     ElMessage.success('保存成功')
-    dialogVisible.value = false
+    wizardVisible.value = false
     load()
   } finally {
     submitting.value = false
@@ -341,6 +509,9 @@ onMounted(() => {
 </script>
 
 <style scoped>
+.pipeline-page {
+  border-radius: 12px;
+}
 .toolbar {
   display: flex;
   justify-content: space-between;
@@ -358,11 +529,139 @@ onMounted(() => {
 .tip {
   font-size: 12px;
   color: var(--el-text-color-secondary);
-  line-height: 1.4;
-  margin-top: 4px;
+  line-height: 1.5;
+  margin-top: 10px;
 }
 .pager {
   margin-top: 12px;
   justify-content: flex-end;
+}
+
+/* ---------- 向导弹窗 ---------- */
+.wizard-header {
+  background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 55%, #0ea5e9 100%);
+  border-radius: 12px;
+  padding: 18px 22px;
+  margin-bottom: 16px;
+  color: #fff;
+}
+.wh-title {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+.wh-sub {
+  font-size: 12px;
+  opacity: 0.85;
+  margin-top: 4px;
+}
+.wizard-steps {
+  margin: 6px 0 18px;
+}
+.wizard-panel {
+  min-height: 240px;
+}
+.panel-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.panel-label::before {
+  content: '';
+  width: 4px;
+  height: 14px;
+  border-radius: 2px;
+  background: linear-gradient(180deg, #4f46e5, #0ea5e9);
+}
+.type-cards {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.type-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  border: 1px solid var(--el-border-color);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background: var(--el-bg-color);
+}
+.type-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(80, 70, 229, 0.12);
+  border-color: #4f46e5;
+}
+.type-card.active {
+  border-color: #4f46e5;
+  background: linear-gradient(135deg, rgba(79, 70, 229, 0.08), rgba(14, 165, 233, 0.08));
+  box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.15);
+}
+.tc-icon {
+  font-size: 26px;
+}
+.tc-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+}
+.panel-form {
+  margin-top: 4px;
+}
+
+.engine-cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  margin-bottom: 8px;
+}
+.engine-card {
+  position: relative;
+  padding: 18px 16px;
+  border: 1px solid var(--el-border-color);
+  border-radius: 14px;
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.2s ease;
+  background: var(--el-bg-color);
+}
+.engine-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(80, 70, 229, 0.12);
+  border-color: #4f46e5;
+}
+.engine-card.active {
+  border-color: #4f46e5;
+  background: linear-gradient(135deg, rgba(79, 70, 229, 0.08), rgba(14, 165, 233, 0.08));
+  box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.15);
+}
+.ec-icon {
+  font-size: 34px;
+}
+.ec-name {
+  font-size: 15px;
+  font-weight: 700;
+  margin-top: 8px;
+  color: var(--el-text-color-primary);
+}
+.ec-desc {
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+  margin-top: 4px;
+}
+.ec-tag {
+  margin-top: 8px;
+}
+.wizard-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
 }
 </style>

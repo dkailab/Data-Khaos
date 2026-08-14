@@ -5,6 +5,7 @@ import cn.hutool.json.JSONObject;
 import cn.hutool.json.JSONUtil;
 import com.datakhaos.common.exception.BusinessException;
 import com.datakhaos.common.util.EncryptUtil;
+import com.datakhaos.pipeline.engine.EngineUtils;
 import com.datakhaos.pipeline.engine.PipelineEngine;
 import com.datakhaos.pipeline.entity.PipelineInstance;
 import com.datakhaos.pipeline.entity.PipelineTask;
@@ -28,7 +29,8 @@ import java.util.Map;
  * DB-Sync 兜底引擎：通过 JDBC 直连源/目标数据源完成同步，
  * 不依赖外部引擎二进制，保证最小闭环可用。
  *
- * <p>当前支持 MySQL → MySQL 同步；其余类型返回明确提示（可扩展）。
+ * <p>支持 JDBC 直连类型 MYSQL / HIVE（HiveServer2），可用于 Hive→MySQL、MySQL→MySQL 等组合；
+ * 其余类型返回明确提示（可扩展）。
  */
 @Slf4j
 @Component
@@ -60,7 +62,7 @@ public class DbSyncEngine implements PipelineEngine {
 
     @Override
     public String buildRunConfig(PipelineTask task) {
-        return cn.hutool.json.JSONUtil.toJsonStr(Map.of(
+        return JSONUtil.toJsonStr(Map.of(
                 "source", task.getSourceTable(),
                 "target", task.getTargetTable(),
                 "mode", "JDBC 直连同步"));
@@ -72,34 +74,44 @@ public class DbSyncEngine implements PipelineEngine {
                 || StrUtil.isBlank(task.getTargetDsId()) || StrUtil.isBlank(task.getTargetTable())) {
             throw new BusinessException("DB-Sync 引擎需配置源/目标数据源与表");
         }
-        Map<String, Object> source = getDs(task.getSourceDsId());
-        Map<String, Object> target = getDs(task.getTargetDsId());
-        checkMysql(source, target);
+        Map<String, Object> source = EngineUtils.getDs(jdbcTemplate, task.getSourceDsId());
+        Map<String, Object> target = EngineUtils.getDs(jdbcTemplate, task.getTargetDsId());
+        EngineUtils.checkJdbc(source, target);
 
-        String sourceUrl = url(source);
-        String targetUrl = url(target);
+        String sourceUrl = EngineUtils.jdbcUrl(source);
+        String targetUrl = EngineUtils.jdbcUrl(target);
         String sourceUser = (String) source.get("username");
-        String sourcePwd = decrypt((String) source.get("password"));
+        String sourcePwd = EngineUtils.decryptPwd((String) source.get("password"), aesKey);
         String targetUser = (String) target.get("username");
-        String targetPwd = decrypt((String) target.get("password"));
+        String targetPwd = EngineUtils.decryptPwd((String) target.get("password"), aesKey);
 
-        // 1. 读源
-        String selectSql = StrUtil.isNotBlank(task.getSourceQuery())
-                ? task.getSourceQuery()
-                : "SELECT * FROM `" + task.getSourceTable() + "`";
+        // 1. 读源（Hive 不支持反引号包裹 库.表，MySQL 需要反引号）
+        String sourceType = String.valueOf(source.get("ds_type")).toUpperCase();
+        String selectSql;
+        if (StrUtil.isNotBlank(task.getSourceQuery())) {
+            selectSql = task.getSourceQuery();
+        } else if ("HIVE".equals(sourceType)) {
+            selectSql = "SELECT * FROM " + task.getSourceTable();
+        } else {
+            selectSql = "SELECT * FROM `" + task.getSourceTable() + "`";
+        }
         List<Map<String, Object>> rows = new ArrayList<>();
         List<String> columns = new ArrayList<>();
         try (Connection conn = DriverManager.getConnection(sourceUrl, sourceUser, sourcePwd);
              Statement st = conn.createStatement();
              ResultSet rs = st.executeQuery(selectSql)) {
             ResultSetMetaData md = rs.getMetaData();
+            List<String> rawColumns = new ArrayList<>();
             for (int i = 1; i <= md.getColumnCount(); i++) {
-                columns.add(md.getColumnLabel(i));
+                String label = md.getColumnLabel(i);
+                rawColumns.add(label);
+                // Hive 结果集列标签形如 表名.列名（如 biz_user.id），需去掉前缀作为目标列名
+                columns.add(normalizeColumn(label));
             }
             while (rs.next()) {
                 Map<String, Object> row = new LinkedHashMap<>();
-                for (String col : columns) {
-                    row.put(col, rs.getObject(col));
+                for (int j = 0; j < columns.size(); j++) {
+                    row.put(columns.get(j), rs.getObject(rawColumns.get(j)));
                 }
                 rows.add(row);
             }
@@ -154,32 +166,12 @@ public class DbSyncEngine implements PipelineEngine {
         return mapping;
     }
 
-    private void checkMysql(Map<String, Object> source, Map<String, Object> target) {
-        String st = String.valueOf(source.get("ds_type"));
-        String tt = String.valueOf(target.get("ds_type"));
-        if (!"MYSQL".equalsIgnoreCase(st) || !"MYSQL".equalsIgnoreCase(tt)) {
-            throw new BusinessException("DB-Sync 引擎当前仅支持 MySQL 源/目标（" + st + "→" + tt + "），请使用 DataX/SeaTunnel 或其他引擎");
+    /** 规范化列名：去掉 Hive 结果集列标签中的 表名. 前缀（如 biz_user.id → id） */
+    private String normalizeColumn(String label) {
+        if (label == null) {
+            return label;
         }
-    }
-
-    private String url(Map<String, Object> ds) {
-        String host = String.valueOf(ds.get("host"));
-        int port = ((Number) ds.get("port")).intValue();
-        String db = String.valueOf(ds.get("database_name"));
-        return "jdbc:mysql://" + host + ":" + port + "/" + db
-                + "?useUnicode=true&characterEncoding=utf8&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai";
-    }
-
-    private String decrypt(String pwd) {
-        return StrUtil.isBlank(pwd) ? "" : EncryptUtil.decrypt(pwd, aesKey);
-    }
-
-    private Map<String, Object> getDs(String dsId) {
-        List<Map<String, Object>> list = jdbcTemplate.queryForList(
-                "SELECT ds_type, host, port, database_name, username, password FROM meta_datasource WHERE id = ?", dsId);
-        if (list.isEmpty()) {
-            throw new BusinessException("数据源不存在: " + dsId);
-        }
-        return list.get(0);
+        int dot = label.lastIndexOf('.');
+        return dot > 0 ? label.substring(dot + 1) : label;
     }
 }

@@ -76,7 +76,7 @@ public class SeaTunnelEngine implements PipelineEngine {
         }
         Map<String, Object> source = EngineUtils.getDs(jdbcTemplate, task.getSourceDsId());
         Map<String, Object> target = EngineUtils.getDs(jdbcTemplate, task.getTargetDsId());
-        EngineUtils.checkMysql(source, target);
+        EngineUtils.checkJdbc(source, target);
 
         // 1. 生成 conf/ job.config 配置文件
         String confContent = renderConf(task, source, target);

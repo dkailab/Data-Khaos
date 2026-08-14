@@ -34,19 +34,27 @@ public final class EngineUtils {
         return StrUtil.isBlank(pwd) ? "" : EncryptUtil.decrypt(pwd, aesKey);
     }
 
+    /** 按数据源类型构造 JDBC URL（新增类型在此扩展） */
     public static String jdbcUrl(Map<String, Object> ds) {
+        String type = String.valueOf(ds.get("ds_type")).toUpperCase();
         String host = String.valueOf(ds.get("host"));
         int port = ((Number) ds.get("port")).intValue();
         String db = String.valueOf(ds.get("database_name"));
-        return "jdbc:mysql://" + host + ":" + port + "/" + db
-                + "?useUnicode=true&characterEncoding=utf8&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai";
+        return switch (type) {
+            case "HIVE" -> "jdbc:hive2://" + host + ":" + port + "/" + db;
+            default -> "jdbc:mysql://" + host + ":" + port + "/" + db
+                    + "?useUnicode=true&characterEncoding=utf8&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai";
+        };
     }
 
-    public static void checkMysql(Map<String, Object> source, Map<String, Object> target) {
-        String st = String.valueOf(source.get("ds_type"));
-        String tt = String.valueOf(target.get("ds_type"));
-        if (!"MYSQL".equalsIgnoreCase(st) || !"MYSQL".equalsIgnoreCase(tt)) {
-            throw new BusinessException("当前引擎仅支持 MySQL 源/目标（" + st + "→" + tt + "），其他类型请扩展引擎适配器");
+    /** 校验源/目标均为 JDBC 可直连类型（MYSQL / HIVE），并返回类型名 */
+    public static void checkJdbc(Map<String, Object> source, Map<String, Object> target) {
+        String st = String.valueOf(source.get("ds_type")).toUpperCase();
+        String tt = String.valueOf(target.get("ds_type")).toUpperCase();
+        boolean srcOk = "MYSQL".equals(st) || "HIVE".equals(st);
+        boolean tgtOk = "MYSQL".equals(tt) || "HIVE".equals(tt);
+        if (!srcOk || !tgtOk) {
+            throw new BusinessException("DB-Sync 引擎当前支持 JDBC 直连类型 MYSQL/HIVE（" + st + "→" + tt + "），其他类型请使用 DataX/SeaTunnel");
         }
     }
 
