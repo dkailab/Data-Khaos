@@ -84,12 +84,12 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/approval/todo/TodoList.vue'),
         meta: { title: '待办审批' },
       },
-      // 数据源管理
+      // 数据源配置
       {
         path: 'datasource/list',
         name: 'DatasourceList',
         component: () => import('@/views/datasource/list/DatasourceList.vue'),
-        meta: { title: '数据源列表' },
+        meta: { title: '数据源配置' },
       },
       // 数据管道
       {

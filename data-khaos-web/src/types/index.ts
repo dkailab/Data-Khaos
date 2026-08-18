@@ -159,6 +159,34 @@ export interface UserPermissionDto {
   menus: MenuDto[]
   /** 当前项目组角色合并后的能力位集合（如 module:config / quality:manage 等） */
   capabilityFlags?: string[]
+  /** 当前用户加入的项目组（业务线-项目组） */
+  projectGroups?: ProjectGroupDto[]
+  /** 当前项目组 Id（主组） */
+  projectGroupId?: string
+}
+
+/** 业务线-项目组（SgProjectGroup） */
+export interface SgProjectGroup {
+  id?: string
+  orgId?: string
+  projectName?: string
+  projectCode?: string
+  leaderId?: string
+  status?: number
+  sortOrder?: number
+  createTime?: string
+}
+
+/** 用户所处项目组视图 */
+export interface ProjectGroupDto {
+  id?: string
+  orgId?: string
+  projectName?: string
+  projectCode?: string
+  /** 是否主组 */
+  primary?: boolean
+  roles?: string[]
+  capabilityFlags?: string[]
 }
 
 /** 能力位常量（与后端 PermissionConstants 对齐） */
@@ -804,6 +832,8 @@ export interface PipelineTask {
   config?: string
   /** 定时表达式（空=仅手动） */
   cronExpr?: string
+  /** 归属项目组（业务线-项目组隔离） */
+  projectGroupId?: string
   /** 1=启用 0=停用 */
   status?: number
   createBy?: string

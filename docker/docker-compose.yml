@@ -260,37 +260,123 @@ services:
     ports:
       - "8092:8092"
 
-  # ---------- Hive 数仓（Apache Hive 4.0，local 模式） ----------
-  # 单机本地模式：内嵌 Derby 元数据库 + 本地 warehouse，无需 HDFS。
-  # HiveServer2 暴露 10000 端口，供数据源接入 / 数据管道任务访问。
+  # ---------- HDFS（复用 apache/hive 镜像内的 Hadoop 3.3.6，arm64 原生） ----------
+  # 单节点 HDFS：namenode + datanode。供 Hive warehouse 与 DataX hdfsreader/hdfswriter 使用。
+  hdfs-namenode:
+    image: apache/hive:4.0.0
+    container_name: dk-hdfs-namenode
+    user: "1000:1000"
+    entrypoint: sh
+    command:
+      - -c
+      - |
+        /opt/hadoop/bin/hdfs namenode -format -force -nonInteractive ||
+        /opt/hadoop/bin/hdfs namenode -format -nonInteractive 2>/dev/null || true
+        /opt/hadoop/bin/hdfs namenode
+    environment:
+      HADOOP_HOME: /opt/hadoop
+      HADOOP_CONF_DIR: /etc/hdfs-conf
+      HADOOP_HEAPSIZE: "512"          # 压小 NameNode 堆，避免挤占 Hive 内存
+      HADOOP_NAMENODE_OPTS: "-Xmx512m -Xms256m"
+      HADOOP_OPTS: "-Xmx512m"
+    volumes:
+      - ./hdfs-conf:/etc/hdfs-conf:ro
+      - hdfs-namenode:/hadoop/dfs/name
+      - hdfs-tmp:/hadoop/tmp
+    ports:
+      - "9870:9870"    # NameNode HTTP UI
+      - "9000:9000"    # NameNode RPC
+    healthcheck:
+      test: ["CMD", "sh", "-c", "/opt/hadoop/bin/hdfs dfsadmin -report >/dev/null 2>&1 || exit 1"]
+      interval: 15s
+      timeout: 20s
+      retries: 30
+      start_period: 40s
+    restart: unless-stopped
+    networks:
+      - dk-net
+
+  hdfs-datanode:
+    image: apache/hive:4.0.0
+    container_name: dk-hdfs-datanode
+    user: "1000:1000"
+    entrypoint: sh
+    command:
+      - -c
+      - |
+        /opt/hadoop/bin/hdfs datanode
+    environment:
+      HADOOP_HOME: /opt/hadoop
+      HADOOP_CONF_DIR: /etc/hdfs-conf
+      HADOOP_HEAPSIZE: "512"          # 压小 DataNode 堆
+      HADOOP_CLIENT_OPTS: "-Xmx256m"
+      HADOOP_DATANODE_OPTS: "-Xmx512m -Xms256m"
+      HADOOP_OPTS: "-Xmx512m"
+    volumes:
+      - ./hdfs-conf:/etc/hdfs-conf:ro
+      - hdfs-datanode:/hadoop/dfs/data
+      - hdfs-tmp:/hadoop/tmp
+    depends_on:
+      hdfs-namenode:
+        condition: service_started
+    restart: unless-stopped
+    networks:
+      - dk-net
+
+  # ---------- Hive 数仓（Apache Hive 4.0，warehouse 落 HDFS） ----------
+  # 复用 apache/hive 镜像内的 Hadoop 3.3.6 连接 HDFS，warehouse 存于 hdfs://hdfs-namenode:9000。
+  # HiveServer2 仍暴露 10000 端口，供数据源接入 / 数据管道任务访问（JDBC 路径不变，
+  # 因此 DB-Sync 等其它插件不受影响）。
   hive:
     image: apache/hive:4.0.0
     container_name: dk-hive
+    entrypoint: sh
+    command:
+      - -c
+      - |
+        echo "hdfs" && nc -z hdfs-namenode 9000
+        # 清理上次异常退出残留的 PID 锁，避免"HiveServer2 running as process"导致的重启循环
+        rm -f /opt/hive/conf/hiveserver2.pid
+        /entrypoint.sh
     environment:
       SERVICE_NAME: hiveserver2
       DB_DRIVER: derby
       IS_RESUME: "false"
       HIVE_SERVER2_THRIFT_PORT: "10000"
       HIVE_SERVER2_THRIFT_BIND_HOST: 0.0.0.0
+      HADOOP_HOME: /opt/hadoop
+      HIVE_CUSTOM_CONF_DIR: /etc/hive-conf
+      HADOOP_HEAPSIZE: "768"
+      HADOOP_OPTS: "-Xmx768m -Xms256m"
+      HADOOP_CLIENT_OPTS: "-Xmx512m"
+      HADOOP_DATANODE_OPTS: "-Xmx256m"
       TZ: Asia/Shanghai
+    mem_limit: 1536m          # 容器内存上限，避免 JVM 申请超 VM 剩余导致被 OOM 击杀
+    mem_reservation: 512m
     ports:
       - "10000:10000"
     volumes:
-      - hive-data:/opt/hive/data
-      - hive-derby:/opt/hive/derby
+      - hive-metastore:/opt/hive/meta_data
+      - ./hdfs-conf:/etc/hive-conf:ro
+    depends_on:
+      hdfs-namenode:
+        condition: service_started
     healthcheck:
       test: ["CMD", "bash", "-c", "beeline -u 'jdbc:hive2://127.0.0.1:10000/default' -e 'select 1' >/dev/null 2>&1"]
       interval: 15s
       timeout: 20s
-      retries: 20
-      start_period: 60s
+      retries: 30
+      start_period: 90s
     restart: unless-stopped
     networks:
       - dk-net
 
 volumes:
-  hive-data:
-  hive-derby:
+  hive-metastore:
+  hdfs-conf:
+  hdfs-namenode:
+  hdfs-datanode:
+  hdfs-tmp:
   mysql-data:
   redis-data:
   nacos-data:

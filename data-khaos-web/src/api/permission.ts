@@ -1,9 +1,14 @@
 import { get, post } from './request'
-import type { UserPermissionDto } from '@/types'
+import type { SgProjectGroup, UserPermissionDto } from '@/types'
 
 /** 查询用户权限视图（角色/权限/菜单） */
 export function getUserPermission(userId: string) {
   return get<UserPermissionDto>(`/permission/user/${userId}`)
+}
+
+/** 查询组织（业务线）下全部项目组 */
+export function listProjectGroups(orgId?: string) {
+  return get<SgProjectGroup[]>('/permission/project-group/list', orgId ? { orgId } : undefined)
 }
 
 /** 查询用户权限标识集合 */

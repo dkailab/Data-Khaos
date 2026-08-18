@@ -811,11 +811,13 @@ CREATE TABLE IF NOT EXISTS pipeline_task (
     field_mapping TEXT COMMENT '字段映射(JSON，选填)',
     config        TEXT COMMENT '引擎扩展配置(JSON)',
     cron_expr     VARCHAR(64)  COMMENT '定时表达式(空=仅手动)',
+    project_group_id VARCHAR(32) COMMENT '归属项目组(业务线-项目组隔离)',
     status        TINYINT      DEFAULT 1 COMMENT '1=启用 0=停用',
     create_by     VARCHAR(32)  COMMENT '创建人',
     create_time   DATETIME     DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     update_time   DATETIME     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     KEY idx_pt_name (task_name),
+    KEY idx_pt_project_group (project_group_id),
     KEY idx_pt_status (status)
 ) ENGINE=InnoDB COMMENT='数据管道任务定义表';
 

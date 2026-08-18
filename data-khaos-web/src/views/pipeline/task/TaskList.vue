@@ -16,6 +16,19 @@
             <el-option label="停用" :value="0" />
           </el-select>
         </el-form-item>
+        <el-form-item label="项目组">
+          <el-select
+            v-model="filterGroupId"
+            clearable
+            placeholder="全部项目组"
+            style="width: 180px"
+            :loading="groupOptionsLoading"
+            @change="handleGroupChange"
+          >
+            <el-option label="全部项目组" value="" />
+            <el-option v-for="g in groupOptions" :key="g.id" :label="g.projectName || g.projectCode || g.id" :value="g.id!" />
+          </el-select>
+        </el-form-item>
         <el-form-item>
           <el-button type="primary" :icon="Search" @click="handleSearch">查询</el-button>
           <el-button :icon="Refresh" @click="handleReset">重置</el-button>
@@ -24,8 +37,13 @@
       <el-button type="primary" :icon="Plus" @click="openCreate">新建同步任务</el-button>
     </div>
 
-    <el-table v-loading="loading" :data="list" border stripe>
+    <el-table v-loading="loading" :data="visibleList" border stripe>
       <el-table-column prop="taskName" label="任务名称" min-width="150" show-overflow-tooltip />
+      <el-table-column label="项目组" width="150">
+        <template #default="{ row }">
+          <span>{{ groupName(row.projectGroupId) }}</span>
+        </template>
+      </el-table-column>
       <el-table-column label="类型" width="90">
         <template #default="{ row }">
           <el-tag>{{ taskTypeText(row.taskType) }}</el-tag>
@@ -54,8 +72,9 @@
         </template>
       </el-table-column>
       <el-table-column prop="updateTime" label="更新时间" width="170" />
-      <el-table-column label="操作" width="300" fixed="right">
+      <el-table-column label="操作" width="400" fixed="right">
         <template #default="{ row }">
+          <el-button link type="primary" :disabled="!row.sourceDsId || !row.sourceTable" @click="openProbeRow(row, 'source')">探数</el-button>
           <el-button link type="primary" @click="openEdit(row)">编辑</el-button>
           <el-button v-if="row.status !== 1" link type="success" @click="handleEnable(row)">启用</el-button>
           <el-button v-else link type="warning" @click="handleDisable(row)">停用</el-button>
@@ -119,7 +138,10 @@
             </el-select>
           </el-form-item>
           <el-form-item label="源表">
-            <el-input v-model="wizardForm.sourceTable" placeholder="源表名 / Hive 表（库.表）" />
+            <div class="table-input-row">
+              <el-input v-model="wizardForm.sourceTable" placeholder="源表名 / Hive 表（库.表）" />
+              <el-button type="primary" plain :disabled="!wizardForm.sourceDsId || !wizardForm.sourceTable" @click="openProbe('source')">探数</el-button>
+            </div>
           </el-form-item>
         </el-form>
       </div>
@@ -146,7 +168,10 @@
             </el-select>
           </el-form-item>
           <el-form-item label="目标表">
-            <el-input v-model="wizardForm.targetTable" placeholder="目标表名" />
+            <div class="table-input-row">
+              <el-input v-model="wizardForm.targetTable" placeholder="目标表名" />
+              <el-button type="primary" plain :disabled="!wizardForm.targetDsId || !wizardForm.targetTable" @click="openProbe('target')">探数</el-button>
+            </div>
           </el-form-item>
         </el-form>
       </div>
@@ -240,6 +265,55 @@
         <el-table-column prop="errorMessage" label="失败原因" min-width="160" show-overflow-tooltip />
       </el-table>
     </el-dialog>
+
+    <!-- 探数对话框 -->
+    <el-dialog v-model="probeVisible" :title="`探数 - ${probeLabel}`" width="920px">
+      <div v-if="probeLoading" class="probe-loading">
+        <el-icon class="is-loading"><Loading /></el-icon>
+        <span>正在探数中，请稍候...</span>
+      </div>
+      <template v-else>
+        <el-descriptions :column="2" border size="small">
+          <el-descriptions-item label="连接状态">
+            <el-tag :type="probeConnectOk ? 'success' : 'danger'">
+              {{ probeConnectOk ? '连接成功' : '连接失败' }}
+            </el-tag>
+          </el-descriptions-item>
+          <el-descriptions-item label="表行数">{{ probeRowCount }}</el-descriptions-item>
+        </el-descriptions>
+
+        <div class="probe-section">
+          <div class="section-title">表字段（{{ probeColumns.length }}）</div>
+          <el-table :data="probeColumns" border size="small" max-height="240">
+            <el-table-column prop="columnName" label="字段名" width="150" />
+            <el-table-column prop="columnType" label="类型" width="120" />
+            <el-table-column label="可空" width="60" align="center">
+              <template #default="{ row }">
+                <el-tag v-if="row.nullable" size="small" type="info">是</el-tag>
+                <el-tag v-else size="small">否</el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column label="主键" width="60" align="center">
+              <template #default="{ row }">
+                <el-tag v-if="row.primaryKey" size="small" type="primary">是</el-tag>
+                <el-tag v-else size="small">否</el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column prop="description" label="注释" />
+          </el-table>
+        </div>
+
+        <div v-if="probeSample.rows && probeSample.rows.length" class="probe-section">
+          <div class="section-title">样例数据（前 {{ probeSample.rows.length }} 行）</div>
+          <el-table :data="probeSample.rows" border size="small" max-height="280">
+            <el-table-column v-for="col in probeSample.columns" :key="col.columnName" :prop="col.columnName" :label="col.columnName" />
+          </el-table>
+        </div>
+      </template>
+      <template #footer>
+        <el-button @click="probeVisible = false">关闭</el-button>
+      </template>
+    </el-dialog>
   </el-card>
 </template>
 
@@ -254,6 +328,7 @@ import {
   Document,
   Files,
   Grid,
+  Loading,
   MagicStick,
   Odometer,
   Plus,
@@ -272,8 +347,9 @@ import {
   runPipelineTask,
   updatePipelineTask,
 } from '@/api/pipeline'
-import { pageDatasources } from '@/api/datasource'
-import type { MetaDatasource, PipelineEngineInfo, PipelineInstance, PipelineTask } from '@/types'
+import { executeSql, listColumnInfos, pageDatasources, tableCount, testDatasourceById } from '@/api/datasource'
+import { listProjectGroups } from '@/api/permission'
+import type { ColumnInfo, MetaDatasource, PipelineEngineInfo, PipelineInstance, PipelineTask, ProjectGroupDto } from '@/types'
 
 const loading = ref(false)
 const submitting = ref(false)
@@ -307,10 +383,56 @@ const dbTypes = computed(() => [
 const engineOptions = ref<PipelineEngineInfo[]>([])
 const dsOptions = ref<MetaDatasource[]>([])
 
+// 项目组名称映射（业务线-项目组隔离展示）
+const groupMap = ref<Record<string, string>>({})
+
+// 顶部「项目组」选择器：列表按项目组过滤 + 新建任务归属当前选中项目组
+const groupOptions = ref<ProjectGroupDto[]>([])
+const groupOptionsLoading = ref(false)
+const filterGroupId = ref('')
+
+/** 按选中项目组过滤后的任务列表（空 = 全部项目组） */
+const visibleList = computed(() =>
+  filterGroupId.value ? list.value.filter((t) => (t.projectGroupId || '') === filterGroupId.value) : list.value,
+)
+
+function groupName(id?: string) {
+  return (id && groupMap.value[id]) || id || '-'
+}
+
+async function loadProjectGroupOptions() {
+  if (groupOptionsLoading.value) return
+  groupOptionsLoading.value = true
+  try {
+    const all = (await listProjectGroups()) || []
+    groupOptions.value = all
+    for (const g of all) {
+      if (g.id) groupMap.value[g.id] = g.projectName || g.projectCode || g.id
+    }
+  } catch {
+    groupOptions.value = []
+  } finally {
+    groupOptionsLoading.value = false
+  }
+}
+
+function handleGroupChange() {
+  load()
+}
+
 const instanceVisible = ref(false)
 const instanceLoading = ref(false)
 const instances = ref<PipelineInstance[]>([])
 const currentTask = ref<PipelineTask>()
+
+// 探数状态
+const probeVisible = ref(false)
+const probeLoading = ref(false)
+const probeLabel = ref('')
+const probeConnectOk = ref(false)
+const probeRowCount = ref(0)
+const probeColumns = ref<ColumnInfo[]>([])
+const probeSample = ref<{ columns: ColumnInfo[]; rows: Record<string, any>[] }>({ columns: [], rows: [] })
 
 const sourceDsOptions = computed(() => dsOptions.value.filter((d) => d.dsType === sourceType.value))
 const targetDsOptions = computed(() => dsOptions.value.filter((d) => d.dsType === targetType.value))
@@ -402,6 +524,7 @@ function handleReset() {
   query.keyword = ''
   query.engine = undefined
   query.status = undefined
+  filterGroupId.value = ''
   handleSearch()
 }
 
@@ -419,7 +542,7 @@ function openCreate() {
   wizardStep.value = 0
   sourceType.value = 'MYSQL'
   targetType.value = 'MYSQL'
-  Object.assign(wizardForm, { taskName: '', taskType: 'SYNC', engine: 'DB_SYNC', sourceDsId: '', sourceTable: '', targetDsId: '', targetTable: '', sourceQuery: '', fieldMapping: '', config: '', cronExpr: '', status: 1 })
+  Object.assign(wizardForm, { taskName: '', taskType: 'SYNC', engine: 'DB_SYNC', sourceDsId: '', sourceTable: '', targetDsId: '', targetTable: '', sourceQuery: '', fieldMapping: '', config: '', cronExpr: '', status: 1, projectGroupId: filterGroupId.value || '' })
   wizardVisible.value = true
 }
 
@@ -502,8 +625,69 @@ async function openInstances(row: PipelineTask) {
   }
 }
 
+/** 探数：测试连接 + 字段 + 行数 + 样例数据 */
+async function openProbe(side: 'source' | 'target') {
+  const dsId = side === 'source' ? wizardForm.sourceDsId : wizardForm.targetDsId
+  const tableInput = (side === 'source' ? wizardForm.sourceTable : wizardForm.targetTable)?.trim()
+  if (!dsId || !tableInput) return
+  await startProbe(dsId, tableInput)
+}
+
+/** 列表行探数（探源表） */
+async function openProbeRow(row: PipelineTask, side: 'source' | 'target') {
+  const dsId = side === 'source' ? row.sourceDsId : row.targetDsId
+  const tableInput = (side === 'source' ? row.sourceTable : row.targetTable)?.trim()
+  if (!dsId || !tableInput) return
+  await startProbe(dsId, tableInput)
+}
+
+async function startProbe(dsId: string, tableInput: string) {
+  const ds = dsOptions.value.find((d) => d.id === dsId)
+  if (!ds) return ElMessage.warning('请先选择数据源')
+  // 支持「库.表」或纯表名（用数据源默认库）
+  const db = ds.databaseName || 'default'
+  let database = db
+  let table = tableInput
+  if (table.includes('.')) {
+    const idx = table.lastIndexOf('.')
+    database = table.slice(0, idx)
+    table = table.slice(idx + 1)
+  }
+  probeLabel.value = `${ds.dsName}.${database}.${table}`
+  probeVisible.value = true
+  probeLoading.value = true
+  probeConnectOk.value = false
+  probeRowCount.value = 0
+  probeColumns.value = []
+  probeSample.value = { columns: [], rows: [] }
+  try {
+    probeConnectOk.value = !!await testDatasourceById(dsId)
+    const cols = await listColumnInfos(dsId, database, table)
+    probeColumns.value = cols || []
+    if (probeConnectOk.value) {
+      try {
+        probeRowCount.value = Number(await tableCount(dsId, database, table)) || 0
+      } catch {
+        /* 行数统计失败不影响整体 */
+      }
+      try {
+        const res = await executeSql(dsId, `SELECT * FROM ${database}.${table} LIMIT 20`)
+        probeSample.value = { columns: res.columns || [], rows: res.rows || [] }
+      } catch (e: any) {
+        ElMessage.warning('样例数据获取失败：' + (e?.message || '未知错误'))
+      }
+    }
+  } catch (e: any) {
+    probeConnectOk.value = false
+    ElMessage.error('探数失败：' + (e?.message || '未知错误'))
+  } finally {
+    probeLoading.value = false
+  }
+}
+
 onMounted(() => {
   loadOptions()
+  loadProjectGroupOptions()
   load()
 })
 </script>
@@ -614,6 +798,31 @@ onMounted(() => {
 }
 .panel-form {
   margin-top: 4px;
+}
+.table-input-row {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+}
+.table-input-row .el-input {
+  flex: 1;
+}
+.probe-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 200px;
+  color: var(--el-text-color-secondary);
+}
+.probe-section {
+  margin-top: 12px;
+}
+.probe-section .section-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+  margin-bottom: 6px;
 }
 
 .engine-cards {

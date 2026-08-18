@@ -50,6 +50,9 @@ public class PipelineTask implements Serializable {
     /** 定时表达式（空=仅手动） */
     private String cronExpr;
 
+    /** 归属项目组（业务线-项目组隔离，空=不限制） */
+    private String projectGroupId;
+
     /** 1=启用 0=停用 */
     private Integer status;
 

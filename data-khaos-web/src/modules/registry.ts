@@ -39,7 +39,7 @@ export const CATEGORIES: CategoryDef[] = [
     title: '数据接入',
     icon: 'Connection',
     features: [
-      { key: 'ds_list', title: '数据源管理', path: '/datasource/list', mandatory: true, icon: 'Connection' },
+      { key: 'ds_list', title: '数据源配置', path: '/datasource/list', mandatory: true, icon: 'Connection' },
       { key: 'ds_conn', title: '数据库连接配置', path: '/datasource/list' },
       { key: 'ds_sync', title: '数据同步任务', path: '/pipeline/task', icon: 'DataLine' },
       { key: 'ds_realtime', title: '实时数据接入' },

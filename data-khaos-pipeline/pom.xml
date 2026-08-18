@@ -44,6 +44,11 @@
             <groupId>com.datakhaos</groupId>
             <artifactId>data-khaos-common</artifactId>
         </dependency>
+        <!-- 权限上下文：解析当前用户所属项目组，实现任务按业务线-项目组隔离 -->
+        <dependency>
+            <groupId>com.datakhaos</groupId>
+            <artifactId>data-khaos-permission-api</artifactId>
+        </dependency>
         <!-- Hive JDBC 驱动：DB-Sync 引擎直连 HiveServer2。
              精简依赖避免 fat jar 过大触发 Spring Boot 嵌套 jar 加载器 NegativeArraySizeException：
              仅保留 HiveServer2 客户端必需模块，排除重型/hadoop 生态传递依赖。 -->

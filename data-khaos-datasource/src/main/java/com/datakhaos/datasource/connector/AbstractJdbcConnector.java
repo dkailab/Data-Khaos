@@ -38,6 +38,8 @@ public abstract class AbstractJdbcConnector implements DataSourceConnector {
         List<String> result = new ArrayList<>();
         try (Connection conn = open(config)) {
             DatabaseMetaData meta = conn.getMetaData();
+            // 优先读 schema；MySQL Connector/J 的 getSchemas() 在部分版本返回空，
+            // 此时回退到 catalog（MySQL 的库即 catalog）。
             try (ResultSet rs = meta.getSchemas()) {
                 while (rs.next()) {
                     String name = rs.getString("TABLE_SCHEM");
@@ -46,10 +48,25 @@ public abstract class AbstractJdbcConnector implements DataSourceConnector {
                     }
                 }
             }
+            if (result.isEmpty()) {
+                try (ResultSet rs = meta.getCatalogs()) {
+                    while (rs.next()) {
+                        String name = rs.getString("TABLE_CAT");
+                        if (name != null && !name.isBlank()) {
+                            result.add(name);
+                        }
+                    }
+                }
+            }
         } catch (Exception e) {
             throw new IllegalStateException("获取数据库列表失败: " + e.getMessage(), e);
         }
-        return result;
+        // 过滤 JDBC 内部系统库，避免元数据目录被系统 schema 污染
+        List<String> systemSchemas = List.of("information_schema", "mysql", "performance_schema", "sys", "template0", "template1", "postgres");
+        return result.stream()
+                .filter(n -> !systemSchemas.contains(n.toLowerCase()))
+                .distinct()
+                .toList();
     }
 
     @Override

@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.datakhaos.common.exception.BusinessException;
 import com.datakhaos.common.model.PageResult;
 import com.datakhaos.common.security.MetadataHolder;
+import com.datakhaos.permission.api.service.PermissionConstants;
 import com.datakhaos.pipeline.engine.EngineFactory;
 import com.datakhaos.pipeline.entity.PipelineInstance;
 import com.datakhaos.pipeline.entity.PipelineTask;
@@ -31,11 +32,15 @@ public class PipelineTaskService {
     private final PipelineTaskMapper mapper;
     private final PipelineRunner runner;
     private final EngineFactory engineFactory;
+    private final PipelineAuthContext auth;
     private final @Qualifier("pipelineTaskExecutor") ThreadPoolTaskExecutor executor;
 
     /** 分页查询任务 */
     public PageResult<PipelineTask> page(long current, long size, String keyword, String engine) {
+        PipelineAuthContext.AuthContext ctx = auth.current();
         LambdaQueryWrapper<PipelineTask> wrapper = new LambdaQueryWrapper<PipelineTask>()
+                .eq(!ctx.superAdmin() && StrUtil.isNotBlank(ctx.projectGroupId()),
+                        PipelineTask::getProjectGroupId, ctx.projectGroupId())
                 .like(StrUtil.isNotBlank(keyword), PipelineTask::getTaskName, keyword)
                 .eq(StrUtil.isNotBlank(engine), PipelineTask::getEngine, engine)
                 .orderByDesc(PipelineTask::getCreateTime);
@@ -53,8 +58,11 @@ public class PipelineTaskService {
 
     @Transactional(rollbackFor = Exception.class)
     public void create(PipelineTask task) {
+        PipelineAuthContext.AuthContext ctx = auth.current();
+        auth.requireCap(ctx, PermissionConstants.CAP_PIPELINE_MANAGE);
         validate(task);
         task.setId(null);
+        task.setProjectGroupId(ctx.superAdmin() ? task.getProjectGroupId() : ctx.projectGroupId());
         if (task.getStatus() == null) {
             task.setStatus(1);
         }
@@ -68,6 +76,9 @@ public class PipelineTaskService {
             throw new BusinessException("任务 ID 不能为空");
         }
         PipelineTask exist = get(task.getId());
+        PipelineAuthContext.AuthContext ctx = auth.current();
+        auth.requireCap(ctx, PermissionConstants.CAP_PIPELINE_MANAGE);
+        auth.checkGroup(ctx, exist.getProjectGroupId(), "同步任务");
         if (StrUtil.isBlank(task.getTaskName())) {
             task.setTaskName(exist.getTaskName());
         }
@@ -76,7 +87,10 @@ public class PipelineTaskService {
 
     @Transactional(rollbackFor = Exception.class)
     public void delete(String id) {
-        get(id);
+        PipelineTask exist = get(id);
+        PipelineAuthContext.AuthContext ctx = auth.current();
+        auth.requireCap(ctx, PermissionConstants.CAP_PIPELINE_MANAGE);
+        auth.checkGroup(ctx, exist.getProjectGroupId(), "同步任务");
         mapper.deleteById(id);
     }
 
@@ -88,6 +102,9 @@ public class PipelineTaskService {
     /** 手动触发运行 */
     public PipelineInstance run(String taskId) {
         PipelineTask task = get(taskId);
+        PipelineAuthContext.AuthContext ctx = auth.current();
+        auth.requireCap(ctx, PermissionConstants.CAP_PIPELINE_RUN);
+        auth.checkGroup(ctx, task.getProjectGroupId(), "同步任务");
         if (task.getStatus() == null || task.getStatus() != 1) {
             throw new BusinessException("任务已停用，请先启用");
         }

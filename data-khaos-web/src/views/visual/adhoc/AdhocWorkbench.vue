@@ -7,7 +7,13 @@
       </el-select>
 
       <el-scrollbar class="tree-box">
-        <div class="block-title">库表结构</div>
+        <div class="block-title">
+          库表结构
+          <span class="tree-actions">
+            <el-button link type="primary" size="small" :loading="treeLoading" @click="loadStructure">刷新</el-button>
+            <el-button link type="warning" size="small" :loading="syncing" @click="syncMeta">同步元数据</el-button>
+          </span>
+        </div>
         <el-tree
           v-loading="treeLoading"
           :data="structure"
@@ -16,6 +22,7 @@
           default-expand-all
           @node-click="onTreeClick"
         />
+        <el-empty v-if="!treeLoading && !structure.length" description="暂无表，请先「同步元数据」" :image-size="40" />
       </el-scrollbar>
 
       <el-scrollbar class="saved-box">
@@ -196,7 +203,7 @@ import {
   saveAdhocAsItem,
   saveAdhocQuery,
 } from '@/api/visual'
-import { getStructure } from '@/api/metadata'
+import { getStructure, syncMetadata } from '@/api/metadata'
 import { pageDatasources as pageDs } from '@/api/datasource'
 
 const chartTypes = ['TABLE', 'BAR', 'LINE', 'PIE', 'AREA', 'SCATTER', 'HEATMAP', 'TREEMAP', 'BOXPLOT', 'GAUGE', 'NUMBER'] as const
@@ -249,6 +256,22 @@ const pivot = ref<{ rowDim: string; colDim: string; measure: string } | null>(nu
 
 const structure = ref<any[]>([])
 const treeLoading = ref(false)
+const syncing = ref(false)
+
+/** 同步元数据后刷新库表结构 */
+async function syncMeta() {
+  if (!datasourceId.value) return ElMessage.warning('请选择数据源')
+  syncing.value = true
+  try {
+    await syncMetadata(datasourceId.value)
+    ElMessage.success('元数据同步完成')
+    await loadStructure()
+  } catch {
+    /* 错误由全局拦截器提示 */
+  } finally {
+    syncing.value = false
+  }
+}
 
 /* ============ 派生数据 ============ */
 const paramKeys = computed(() => {
@@ -341,18 +364,20 @@ function autoSuggest() {
   xCol.value = cols[0]
   valCol.value = nums[0] || cols[1] || ''
   seriesCol.value = ''
-  if (nums.length && cols.length > 1) {
-    chartType.value = 'BAR'
-  } else if (cols.length >= 1) {
-    chartType.value = 'PIE'
-  } else {
-    chartType.value = 'TABLE'
-  }
+  // 默认一律以表格展示，图表由用户主动切换（不一定所有查询都适合柱状/饼图）
+  chartType.value = 'TABLE'
 }
 
-function onTreeClick(node: any) {
-  // 点击表/字段节点，将名称插入 SQL 编辑器
-  const name = node.rawName || node.label
+async function onTreeClick(node: any) {
+  // 点击表节点：一键生成并执行 SELECT * FROM 表 LIMIT 100
+  if (node.type === 'table') {
+    const qualified = node.database && node.database !== node.name ? `${node.database}.${node.name}` : node.name
+    sqlText.value = `SELECT * FROM ${qualified} LIMIT 100`
+    await run()
+    return
+  }
+  // 其余节点：将名称插入 SQL 编辑器
+  const name = node.name || node.label
   if (!name) return
   const input = sqlInputRef.value?.textarea
   if (input && typeof input.selectionStart === 'number') {
@@ -552,22 +577,58 @@ async function loadStructure() {
   treeLoading.value = true
   try {
     const data = await getStructure(datasourceId.value)
-    structure.value = (data || []).map(normalizeNode)
+    structure.value = (data || []).map((n: any) => normalizeNode(n))
   } finally {
     treeLoading.value = false
   }
 }
-function normalizeNode(n: any): any {
-  if (n.children) {
-    return { id: n.id, label: n.name || n.label, rawName: n.name, children: n.children.map(normalizeNode) }
+/** 后端结构树: [{ database, tables:[{ table, columns:[...] }] }] → 前端 el-tree 数据集 */
+function normalizeNode(n: any, dbName?: string): any {
+  if (n.database) {
+    const db = n.database
+    return {
+      id: db.id,
+      type: 'database',
+      label: db.databaseName,
+      name: db.databaseName,
+      children: (n.tables || []).map((t: any) => normalizeNode(t, db.databaseName)),
+    }
   }
-  return { id: n.id, label: n.name || n.label, rawName: n.name }
+  if (n.table) {
+    const t = n.table
+    return {
+      id: t.id,
+      type: 'table',
+      label: t.tableName,
+      name: t.tableName,
+      database: dbName,
+      children: (n.columns || []).map((c: any) => normalizeNode(c, dbName)),
+    }
+  }
+  // 字段节点：后端字段仅含 columnName/columnType，需映射为 name/label，否则下拉无内容
+  if (n.columnName != null) {
+    return {
+      id: n.id,
+      type: 'field',
+      name: n.columnName,
+      label: n.columnName, // 展开表节点即可见字段名
+      columnType: n.columnType,
+      database: dbName,
+    }
+  }
+  // 扁平/兜底结构
+  if (n.children) {
+    return { id: n.id, type: 'node', label: n.name || n.label, name: n.name, children: n.children.map((c: any) => normalizeNode(c, dbName)) }
+  }
+  return { id: n.id, type: 'node', label: n.name || n.label, name: n.name, database: dbName }
 }
 
 onMounted(async () => {
   const ds = await pageDs({ current: 1, size: 100 })
   datasources.value = ds.records || []
   if (datasources.value.length) datasourceId.value = datasources.value[0].id!
+  // 首次进入即自动加载选中数据源的库表结构，避免树为空
+  loadStructure()
   loadSaved()
 })
 </script>
@@ -608,6 +669,11 @@ onMounted(async () => {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 4px;
+}
+.tree-actions {
+  display: inline-flex;
+  gap: 4px;
+  white-space: nowrap;
 }
 .saved-item {
   display: flex;
