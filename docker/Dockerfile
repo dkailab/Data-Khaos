@@ -36,6 +36,7 @@ COPY data-khaos-schedule/     ./data-khaos-schedule/
 COPY data-khaos-notification/ ./data-khaos-notification/
 COPY data-khaos-dquality/     ./data-khaos-dquality/
 COPY data-khaos-pipeline/     ./data-khaos-pipeline/
+COPY data-khaos-workflow/     ./data-khaos-workflow/
 
 RUN mvn -q -B -DskipTests clean package
 
@@ -77,6 +78,14 @@ RUN if [ "${MODULE}" = "data-khaos-pipeline" ]; then \
 COPY --from=datax_home_stage /usr/local/openjdk-8 /opt/jdk8
 RUN if [ "${MODULE}" = "data-khaos-pipeline" ]; then \
       sed -i 's|ENGINE_COMMAND = "java -server|ENGINE_COMMAND = "/opt/jdk8/bin/java -server|' /opt/datax/bin/datax.py \
+      && rm -rf /var/lib/apt/lists/*; \
+    fi
+
+# 工作流编排需要执行 Python 脚本节点，运行时镜像补充 python3（仅 workflow 需要）
+RUN if [ "${MODULE}" = "data-khaos-workflow" ]; then \
+      apt-get update \
+      && apt-get install -y --no-install-recommends python3 bash \
+      && ln -sf /usr/bin/python3 /usr/local/bin/python \
       && rm -rf /var/lib/apt/lists/*; \
     fi
 

@@ -57,7 +57,7 @@ export const CATEGORIES: CategoryDef[] = [
       { key: 'dev_schedule', title: '任务调度管理', path: '/schedule/job' },
       { key: 'dev_cron', title: '定时任务配置', path: '/schedule/job' },
       { key: 'dev_script', title: '数据脚本管理' },
-      { key: 'dev_workflow', title: '工作流编排' },
+      { key: 'dev_workflow', title: '工作流编排', path: '/workflow/list', icon: 'Share' },
       { key: 'dev_monitor', title: '任务监控' },
       { key: 'dev_version', title: '脚本版本管理' },
     ],

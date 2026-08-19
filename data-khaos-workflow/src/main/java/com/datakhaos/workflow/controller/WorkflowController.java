@@ -1,0 +1,96 @@
+package com.datakhaos.workflow.controller;
+
+import com.datakhaos.common.model.R;
+import com.datakhaos.common.model.PageResult;
+import com.datakhaos.workflow.dto.WorkflowGraphRequest;
+import com.datakhaos.workflow.entity.WorkflowDef;
+import com.datakhaos.workflow.entity.WorkflowNodeRun;
+import com.datakhaos.workflow.entity.WorkflowRun;
+import com.datakhaos.workflow.service.WorkflowService;
+import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
+import java.util.Map;
+
+/**
+ * 工作流编排 REST 接口。
+ */
+@RestController
+@RequestMapping("/api/workflow")
+@RequiredArgsConstructor
+public class WorkflowController {
+
+    private final WorkflowService workflowService;
+
+    /** 保存工作流图（新增/整体更新） */
+    @PostMapping
+    public R<WorkflowDef> save(@RequestBody WorkflowGraphRequest request) {
+        return R.ok(workflowService.saveGraph(request));
+    }
+
+    /** 工作流详情（含节点与连线） */
+    @GetMapping("/{id}")
+    public R<WorkflowGraphRequest> detail(@PathVariable String id) {
+        return R.ok(workflowService.detail(id));
+    }
+
+    /** 分页列表 */
+    @GetMapping("/page")
+    public R<PageResult<WorkflowDef>> page(@RequestParam(defaultValue = "1") long current,
+                                           @RequestParam(defaultValue = "10") long size,
+                                           @RequestParam(required = false) String keyword) {
+        return R.ok(workflowService.page(current, size, keyword));
+    }
+
+    /** 删除工作流 */
+    @DeleteMapping("/{id}")
+    public R<Void> delete(@PathVariable String id) {
+        workflowService.delete(id);
+        return R.ok();
+    }
+
+    /** 更新状态 0:禁用 1:启用 */
+    @PutMapping("/{id}/status")
+    public R<Void> updateStatus(@PathVariable String id,
+                                @RequestParam Integer status) {
+        workflowService.updateStatus(id, status);
+        return R.ok();
+    }
+
+    /** 触发一次手动运行 */
+    @PostMapping("/{id}/trigger")
+    public R<String> trigger(@PathVariable String id,
+                             @RequestBody(required = false) Map<String, Object> params) {
+        String runId = workflowService.trigger(id, params, "MANUAL");
+        return R.ok("触发成功", runId);
+    }
+
+    /** 运行实例分页列表 */
+    @GetMapping("/run/page")
+    public R<List<WorkflowRun>> runPage(@RequestParam(required = false) String wfId,
+                                        @RequestParam(defaultValue = "1") long current,
+                                        @RequestParam(defaultValue = "10") long size) {
+        return R.ok(workflowService.runPage(wfId, current, size));
+    }
+
+    /** 运行实例详情 */
+    @GetMapping("/run/{runId}")
+    public R<WorkflowRun> runDetail(@PathVariable String runId) {
+        return R.ok(workflowService.runDetail(runId));
+    }
+
+    /** 某次运行的节点执行记录 */
+    @GetMapping("/run/{runId}/nodes")
+    public R<List<WorkflowNodeRun>> runNodes(@PathVariable String runId) {
+        return R.ok(workflowService.nodeRuns(runId));
+    }
+}

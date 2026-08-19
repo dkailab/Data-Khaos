@@ -220,6 +220,25 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/schedule/job/JobList.vue'),
         meta: { title: '调度任务' },
       },
+      // 工作流编排
+      {
+        path: 'workflow/list',
+        name: 'WorkflowList',
+        component: () => import('@/views/workflow/list/WorkflowList.vue'),
+        meta: { title: '工作流编排' },
+      },
+      {
+        path: 'workflow/edit/create',
+        name: 'WorkflowEditCreate',
+        component: () => import('@/views/workflow/edit/WorkflowEdit.vue'),
+        meta: { title: '新建工作流' },
+      },
+      {
+        path: 'workflow/edit/:id',
+        name: 'WorkflowEdit',
+        component: () => import('@/views/workflow/edit/WorkflowEdit.vue'),
+        meta: { title: '编排工作流' },
+      },
       // 通知中心
       {
         path: 'notification/template',

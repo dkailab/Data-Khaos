@@ -4,7 +4,7 @@ name: data-khaos
 # Data Khaos - 一键启动编排（开发环境）
 #
 #   基础设施：MySQL 8、Redis 7、Nacos（standalone）
-#   业务服务：网关 + 10 个微服务，共 11 个应用容器
+#   业务服务：网关 + 11 个微服务，共 12 个应用容器
 #
 #   启动：  cd docker && docker compose up -d --build
 #   停止：  docker compose down
@@ -93,8 +93,8 @@ services:
     environment:
       MODE: standalone
       NACOS_AUTH_ENABLE: "false"
-      JVM_XMS: 256m
-      JVM_XMX: 512m
+      JVM_XMS: 768m
+      JVM_XMX: 1024m
     ports:
       - "8848:8848"
       - "9848:9848"   # Nacos 2.x gRPC 端口（服务发现必需）
@@ -259,6 +259,18 @@ services:
     container_name: dk-pipeline
     ports:
       - "8092:8092"
+
+  # ---------- 工作流编排 ----------
+  workflow:
+    <<: *app-common
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      args:
+        MODULE: data-khaos-workflow
+    container_name: dk-workflow
+    ports:
+      - "8093:8093"
 
   # ---------- HDFS（复用 apache/hive 镜像内的 Hadoop 3.3.6，arm64 原生） ----------
   # 单节点 HDFS：namenode + datanode。供 Hive warehouse 与 DataX hdfsreader/hdfswriter 使用。

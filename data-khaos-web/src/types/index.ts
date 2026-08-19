@@ -1092,3 +1092,86 @@ export interface ModuleDisplayConfig {
   createdTime?: string
   updatedTime?: string
 }
+
+/* ==================== 工作流编排 ==================== */
+
+/** 工作流定义 */
+export interface WorkflowDef {
+  id?: string
+  name: string
+  code?: string
+  cronExpression?: string
+  /** 0:禁用/草稿 1:启用 */
+  status?: number
+  description?: string
+  owner?: string
+  /** 运行参数模板(JSON) */
+  params?: string
+  createTime?: string
+  updateTime?: string
+}
+
+/** 工作流节点 */
+export interface WorkflowNode {
+  id?: string
+  wfId?: string
+  nodeCode: string
+  nodeName: string
+  /** SQL / SHELL / PYTHON / DATA_OP */
+  nodeType: string
+  configJson?: string
+  posX?: number
+  posY?: number
+  timeout?: number
+  retryCount?: number
+  retryInterval?: number
+}
+
+/** 工作流依赖边 */
+export interface WorkflowEdge {
+  id?: string
+  wfId?: string
+  fromCode: string
+  toCode: string
+  conditionExpr?: string
+}
+
+/** 工作流图（保存/详情） */
+export interface WorkflowGraph {
+  def: WorkflowDef
+  nodes: WorkflowNode[]
+  edges: WorkflowEdge[]
+}
+
+/** 工作流运行实例 */
+export interface WorkflowRun {
+  id?: string
+  wfId?: string
+  wfName?: string
+  triggerType?: string
+  runStatus?: string
+  triggerParams?: string
+  startTime?: string
+  endTime?: string
+  durationMs?: number
+  errorMessage?: string
+  createTime?: string
+}
+
+/** 节点运行实例 */
+export interface WorkflowNodeRun {
+  id?: string
+  runId?: string
+  wfId?: string
+  nodeCode?: string
+  nodeName?: string
+  nodeType?: string
+  status?: string
+  startTime?: string
+  endTime?: string
+  durationMs?: number
+  resultRows?: number
+  logText?: string
+  errorMessage?: string
+  createTime?: string
+}
