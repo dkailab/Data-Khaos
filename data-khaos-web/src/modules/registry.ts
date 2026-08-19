@@ -95,6 +95,8 @@ export const CATEGORIES: CategoryDef[] = [
     title: '数据服务',
     icon: 'Share',
     features: [
+      { key: 'svc_dataset', title: '数据集管理', path: '/visual/dataset', icon: 'Collection' },
+      { key: 'svc_portrait', title: '用户画像', path: '/visual/portrait', icon: 'User' },
       { key: 'svc_report', title: '报表服务', path: '/visual/dashboard' },
       { key: 'svc_adhoc', title: '自助取数', path: '/visual/adhoc' },
       { key: 'svc_market', title: '模型市场', path: '/mart/market' },

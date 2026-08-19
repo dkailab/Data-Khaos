@@ -73,8 +73,8 @@
                     </div>
                     <div class="map-module-body">
                       <template v-for="feat in mod.features" :key="feat.key">
-                        <span v-if="feat.path" class="map-feature" @click="go(feat.path)">{{ feat.title }}</span>
-                        <span v-else class="map-feature todo" @click="showTodo(feat.title)">{{ feat.title }}（待建设）</span>
+                        <span v-if="feat.path" class="map-feature" @click.stop="go(feat.path)">{{ feat.title }}</span>
+                        <span v-else class="map-feature todo" @click.stop="showTodo(feat.title)">{{ feat.title }}（待建设）</span>
                       </template>
                     </div>
                   </div>

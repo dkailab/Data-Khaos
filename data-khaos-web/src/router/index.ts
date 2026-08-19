@@ -162,6 +162,13 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/visual/dataset/DatasetList.vue'),
         meta: { title: '数据集管理' },
       },
+      // 可视化 - 用户画像
+      {
+        path: 'visual/portrait',
+        name: 'VisualPortrait',
+        component: () => import('@/views/visual/portrait/PortraitList.vue'),
+        meta: { title: '用户画像' },
+      },
       // 可视化 - 仪表板
       {
         path: 'visual/dashboard',
