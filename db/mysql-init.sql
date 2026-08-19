@@ -688,6 +688,7 @@ INSERT INTO sys_menu (id, parent_id, name, path, component, permission, icon, ty
 ('32', '3', '仪表板', '/query/dashboard', 'query/dashboard/index', 'query:dashboard:view', 'PieChart', 1, 2),
 ('33', '3', '分析板', '/query/analysis', 'query/analysis/index', 'query:analysis:view', 'TrendCharts', 1, 3),
 ('34', '3', '即席分析', '/visual/adhoc', 'visual/adhoc/index', 'visual:adhoc:execute', 'Magic', 1, 4),
+('35', '3', '数据集管理', '/visual/dataset', 'visual/dataset/index', 'visual:dataset:list', 'Grid', 1, 5),
 ('4', NULL, '运维管理', '/ops', 'Layout', NULL, 'Operation', 0, 4),
 ('41', '4', '任务调度', '/ops/schedule', 'ops/schedule/index', 'ops:schedule:list', 'Timer', 1, 1),
 ('42', '4', '消息通知', '/ops/notification', 'ops/notification/index', 'ops:notification:list', 'Bell', 1, 2),

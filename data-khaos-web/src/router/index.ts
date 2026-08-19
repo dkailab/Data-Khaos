@@ -155,7 +155,14 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/query/query/QueryWorkbench.vue'),
         meta: { title: '查询工作台' },
       },
-      // 可视化
+      // 可视化 - 数据集
+      {
+        path: 'visual/dataset',
+        name: 'VisualDataset',
+        component: () => import('@/views/visual/dataset/DatasetList.vue'),
+        meta: { title: '数据集管理' },
+      },
+      // 可视化 - 仪表板
       {
         path: 'visual/dashboard',
         name: 'VisualDashboard',
@@ -166,7 +173,13 @@ const routes: RouteRecordRaw[] = [
         path: 'visual/dashboard/edit/:id',
         name: 'VisualDashboardEdit',
         component: () => import('@/views/visual/dashboard/DashboardEditor.vue'),
-        meta: { title: 'DK实时分析板' },
+        meta: { title: '编辑仪表板' },
+      },
+      {
+        path: 'visual/dashboard/view/:id',
+        name: 'VisualDashboardView',
+        component: () => import('@/views/visual/dashboard/DashboardView.vue'),
+        meta: { title: '预览仪表板' },
       },
       {
         path: 'visual/adhoc',
@@ -232,14 +245,30 @@ const router = createRouter({
   routes,
 })
 
-// 登录守卫：无 token 跳转登录页
+// 登录守卫：未登录强制跳登录页（以 localStorage 为准，不受 store 初始化时序影响）
 router.beforeEach((to, _from, next) => {
   const userStore = useUserStore(pinia)
-  if (to.path !== '/login' && !userStore.token) {
-    next({ path: '/login', query: { redirect: to.fullPath } })
-  } else {
+  const hasToken = !!localStorage.getItem('dk_token')
+
+  if (hasToken) {
+    if (to.path === '/login') {
+      // 已登录访问登录页：回到 redirect 参数或首页
+      next((to.query.redirect as string) || '/dashboard')
+      return
+    }
     next()
+    return
   }
+
+  // 未登录：确保 Pinia 状态也被清除（防止拦截器清过后 store 残留）
+  if (userStore.userInfo || userStore.token) {
+    userStore.reset()
+  }
+  if (to.path !== '/login') {
+    next({ path: '/login', query: { redirect: to.fullPath } })
+    return
+  }
+  next()
 })
 
 router.afterEach((to) => {

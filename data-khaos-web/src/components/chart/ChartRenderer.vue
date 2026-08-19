@@ -1,47 +1,61 @@
 <template>
   <div ref="rootEl" class="chart-renderer">
-    <div v-if="loading" class="placeholder empty">数据加载中...</div>
-    <div v-else-if="!result || !rows.length" class="placeholder empty">暂无数据</div>
-
-    <!-- 表格 -->
-    <div v-else-if="chartType === 'TABLE'" class="table-wrap">
-      <el-table :data="rows" border size="small" height="100%" max-height="100%">
-        <el-table-column v-for="c in columns" :key="c" :prop="c" :label="c" min-width="120" show-overflow-tooltip />
-      </el-table>
+    <!-- 组件标题栏 -->
+    <div v-if="showTitle" class="chart-title-bar">
+      <span class="chart-title-text">{{ title }}</span>
     </div>
 
-    <!-- 指标卡（基础/对比/迷你趋势） -->
-    <div v-else-if="chartType === 'NUMBER'" class="metric-card">
-      <!-- 指标名称 + 辅助副标题 -->
-      <div class="metric-label">
-        <span class="metric-name">{{ metricName }}</span>
-        <span v-if="metricSubtitle" class="metric-subtitle">{{ metricSubtitle }}</span>
+    <div class="chart-body" :class="{ 'has-title': showTitle }">
+      <div v-if="loading" class="placeholder loading">
+        <el-icon class="loading-icon"><Loading /></el-icon>
+        <span>数据加载中...</span>
       </div>
-      <!-- 主指标数值 + 单位 -->
-      <div class="metric-value-row">
-        <span class="metric-value" :class="{ 'is-small': metricValue.length > 9 }">{{ metricValue }}</span>
-        <span v-if="unitText" class="metric-unit">{{ unitText }}</span>
+      <div v-else-if="!result || !rows.length" class="placeholder empty">
+        <el-icon :size="32"><DataLine /></el-icon>
+        <span>暂无数据</span>
+        <span class="placeholder-hint">请配置数据源和SQL查询</span>
       </div>
-      <!-- 对比（红跌绿涨 / 涨跌率 / 趋势箭头） -->
-      <div v-if="isCompare && compareValue !== null" class="metric-compare" :class="compareClass">
-        <span class="metric-arrow"><component :is="compareArrow" /></span>
-        <span class="metric-compare-label">{{ compareLabel }}</span>
-        <span class="metric-compare-value">{{ compareValueText }}</span>
-        <span class="metric-compare-rate">{{ compareRateText }}</span>
-      </div>
-      <!-- 指标趋势迷你图 -->
-      <div v-if="spark" ref="sparkEl" class="metric-spark"></div>
-    </div>
 
-    <!-- ECharts 图表 -->
-    <div v-else ref="chartEl" class="chart-box"></div>
+      <!-- 表格 -->
+      <div v-else-if="chartType === 'TABLE'" class="table-wrap">
+        <el-table :data="rows" border size="small" height="100%" max-height="100%" stripe>
+          <el-table-column v-for="c in columns" :key="c" :prop="c" :label="c" min-width="120" show-overflow-tooltip />
+        </el-table>
+      </div>
+
+      <!-- 指标卡（基础/对比/迷你趋势） -->
+      <div v-else-if="chartType === 'NUMBER'" class="metric-card">
+        <!-- 指标名称 + 辅助副标题 -->
+        <div class="metric-label">
+          <span class="metric-name">{{ metricName }}</span>
+          <span v-if="metricSubtitle" class="metric-subtitle">{{ metricSubtitle }}</span>
+        </div>
+        <!-- 主指标数值 + 单位 -->
+        <div class="metric-value-row">
+          <span class="metric-value" :class="{ 'is-small': metricValue.length > 9 }">{{ metricValue }}</span>
+          <span v-if="unitText" class="metric-unit">{{ unitText }}</span>
+        </div>
+        <!-- 对比（红跌绿涨 / 涨跌率 / 趋势箭头） -->
+        <div v-if="isCompare && compareValue !== null" class="metric-compare" :class="compareClass">
+          <span class="metric-arrow"><component :is="compareArrow" /></span>
+          <span class="metric-compare-label">{{ compareLabel }}</span>
+          <span class="metric-compare-value">{{ compareValueText }}</span>
+          <span class="metric-compare-rate">{{ compareRateText }}</span>
+        </div>
+        <!-- 指标趋势迷你图 -->
+        <div v-if="spark" ref="sparkEl" class="metric-spark"></div>
+      </div>
+
+      <!-- ECharts 图表 -->
+      <div v-else ref="chartEl" class="chart-box"></div>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import * as echarts from 'echarts'
-import { ArrowDownBold, ArrowUpBold } from '@element-plus/icons-vue'
+import { ArrowDownBold, ArrowUpBold, DataLine, Loading } from '@element-plus/icons-vue'
 import type { QueryResult, VisualDashboardItem } from '@/types'
 
 const props = defineProps<{
@@ -51,6 +65,8 @@ const props = defineProps<{
   height?: number
   /** 主题（light/dark），变化时重绘图表以适配深浅色 */
   theme?: 'light' | 'dark'
+  /** 是否显示组件标题栏 */
+  showTitle?: boolean
 }>()
 
 const emit = defineEmits<{ (e: 'drill', payload: { column: string; value: string }): void }>()
@@ -93,6 +109,8 @@ let chart: echarts.ECharts | null = null
 let sparkChart: echarts.ECharts | null = null
 let ro: ResizeObserver | null = null
 
+const showTitle = computed(() => props.showTitle !== false && props.item.title)
+
 const chartType = computed(() => props.item.chartType || 'TABLE')
 const title = computed(() => props.item.title || '')
 const rows = computed(() => props.result?.rows || [])
@@ -100,6 +118,18 @@ const columns = computed(() => (props.result?.columns || []).map((c) => c.column
 
 function getConfig(): ChartConfig {
   try {
+    // 优先使用新的 dataConfig
+    if (props.item.dataConfig) {
+      const dc = JSON.parse(props.item.dataConfig)
+      if (dc && (dc.dimensions?.length || dc.metrics?.length)) {
+        return {
+          xAxisColumn: dc.dimensions?.[0]?.fieldCode || '',
+          valueColumn: dc.metrics?.[0]?.fieldCode || '',
+          seriesColumn: dc.dimensions?.[1]?.fieldCode || '',
+        }
+      }
+    }
+    // 兼容旧版 config
     const cfg = props.item.config ? JSON.parse(props.item.config) : {}
     return cfg || {}
   } catch {
@@ -727,39 +757,101 @@ onBeforeUnmount(() => {
   width: 100%;
   height: 100%;
   position: relative;
+  display: flex;
+  flex-direction: column;
+  background: transparent;
 }
+
+/* ============ 标题栏 ============ */
+.chart-title-bar {
+  display: flex;
+  align-items: center;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--card-border, #ebeef5);
+  background: var(--card-bg, #ffffff);
+  flex-shrink: 0;
+}
+
+.chart-title-text {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-1, #303133);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ============ 主体 ============ */
+.chart-body {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+}
+
+.chart-body.has-title {
+  height: calc(100% - 33px);
+}
+
 .chart-box {
   width: 100%;
   height: 100%;
 }
+
 .table-wrap {
   height: 100%;
   overflow: hidden;
 }
+
+/* ============ 占位符 ============ */
 .placeholder {
   height: 100%;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  color: #909399;
+  gap: 8px;
+  color: var(--text-3, #909399);
   font-size: 13px;
 }
-/* ============ 指标卡（颜色使用父组件继承的 CSS 变量，自动适配深浅主题） ============ */
+
+.placeholder.empty {
+  background: linear-gradient(135deg, rgba(79, 157, 249, 0.02), rgba(52, 211, 153, 0.02));
+}
+
+.placeholder .placeholder-hint {
+  font-size: 11px;
+  opacity: 0.6;
+}
+
+.loading-icon {
+  animation: spin 1s linear infinite;
+  font-size: 24px;
+  color: var(--accent, #4f9df9);
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* ============ 指标卡 ============ */
 .metric-card {
   height: 100%;
   display: flex;
   flex-direction: column;
   justify-content: center;
-  padding: 6px 14px;
+  padding: 12px 16px;
   box-sizing: border-box;
   overflow: hidden;
 }
+
 .metric-label {
   display: flex;
   align-items: baseline;
   gap: 8px;
-  margin-bottom: 6px;
+  margin-bottom: 8px;
 }
+
 .metric-name {
   font-size: 13px;
   font-weight: 600;
@@ -768,6 +860,7 @@ onBeforeUnmount(() => {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
 .metric-subtitle {
   font-size: 11px;
   color: var(--text-3, #909399);
@@ -775,14 +868,16 @@ onBeforeUnmount(() => {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
 .metric-value-row {
   display: flex;
   align-items: baseline;
   gap: 6px;
   line-height: 1;
 }
+
 .metric-value {
-  font-size: clamp(26px, 4vw, 40px);
+  font-size: clamp(28px, 4vw, 42px);
   font-weight: 700;
   color: var(--text-1, #303133);
   letter-spacing: -0.5px;
@@ -790,12 +885,15 @@ onBeforeUnmount(() => {
   line-height: 1.1;
   overflow-wrap: anywhere;
 }
-.metric-value.is-small { font-size: clamp(22px, 3.2vw, 32px); }
+
+.metric-value.is-small { font-size: clamp(24px, 3.2vw, 34px); }
+
 .metric-unit {
   font-size: 14px;
   color: var(--text-3, #909399);
   font-weight: 500;
 }
+
 .metric-compare {
   display: flex;
   align-items: center;
@@ -804,24 +902,29 @@ onBeforeUnmount(() => {
   font-size: 12px;
   font-weight: 500;
 }
+
 .metric-arrow { display: inline-flex; align-items: center; }
 .metric-compare-label { color: var(--text-3, #909399); }
 .metric-compare-value { margin-left: 2px; }
 .metric-compare-rate { font-weight: 700; }
-/* 红跌绿涨（默认涨=绿 跌=红） */
+
 .metric-up { color: #34d399; }
 .metric-down { color: #f56c6c; }
+
 .metric-spark {
-  height: 34px;
+  height: 36px;
   margin-top: 8px;
   width: 100%;
 }
+
 /* ============ 响应式 ============ */
 @media (max-width: 600px) {
-  .metric-value { font-size: 30px; }
-  .metric-value.is-small { font-size: 26px; }
+  .metric-value { font-size: 32px; }
+  .metric-value.is-small { font-size: 28px; }
   .metric-name { font-size: 12px; }
   .metric-unit { font-size: 12px; }
-  .metric-card { padding: 4px 10px; }
+  .metric-card { padding: 8px 12px; }
+  .chart-title-bar { padding: 4px 8px; }
+  .chart-title-text { font-size: 12px; }
 }
 </style>

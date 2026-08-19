@@ -1,6 +1,7 @@
 import axios from 'axios'
 import type { AxiosRequestConfig } from 'axios'
 import { ElMessage } from 'element-plus'
+import { useUserStore } from '@/stores/user'
 import type { R } from '@/types'
 
 /**
@@ -25,8 +26,21 @@ service.interceptors.request.use(
   (error) => Promise.reject(error),
 )
 
+let isRedirecting = false
+
 function toLogin() {
+  if (isRedirecting) return
+  isRedirecting = true
+  // 清除本地存储
   localStorage.removeItem('dk_token')
+  // 清除 Pinia 用户状态
+  try {
+    const userStore = useUserStore()
+    userStore.reset()
+  } catch {
+    // store 可能尚未初始化，忽略
+  }
+  // 强制跳转到登录页
   if (window.location.pathname !== '/login') {
     window.location.href = '/login'
   }

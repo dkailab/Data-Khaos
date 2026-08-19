@@ -569,6 +569,178 @@ export interface QueryHistory {
 
 /* ==================== 可视化 ==================== */
 
+/** 数据集 */
+export interface VisualDataset {
+  id?: string
+  name: string
+  code: string
+  description?: string
+  /** SQL / MODEL */
+  datasetType: string
+  datasourceId?: string
+  querySql?: string
+  modelId?: string
+  refreshInterval?: number
+  visibility?: string
+  status?: string
+  version?: number
+  createBy?: string
+  createTime?: string
+  updateTime?: string
+  fields?: DatasetField[]
+  variables?: DatasetVariable[]
+}
+
+export interface DatasetField {
+  id?: string
+  fieldName: string
+  fieldCode: string
+  /** DIMENSION / METRIC */
+  fieldType: string
+  /** STRING / INTEGER / DECIMAL / DATE */
+  dataType?: string
+  /** SUM / AVG / COUNT / COUNT_DISTINCT / MAX / MIN */
+  aggType?: string
+  format?: string
+  sortOrder?: number
+}
+
+export interface DatasetVariable {
+  varName: string
+  varType: string
+  defaultValue: string
+}
+
+/** 分析板配置（一个仪表板可以包含多个分析板Tab） */
+export interface DashboardBoard {
+  id: string
+  dashboardId?: string
+  name: string
+  /** 图标 */
+  icon?: string
+  /** 画布/布局模式: CANVAS(自由画布) / GRID(网格布局) */
+  layoutMode?: string
+  /** 画布宽度(自由画布模式) */
+  canvasWidth?: number
+  /** 画布高度(自由画布模式) */
+  canvasHeight?: number
+  /** 画布背景色 */
+  canvasBg?: string
+  /** 网格配置(JSON) */
+  gridConfig?: string
+  /** 分析板级筛选器(JSON) */
+  filters?: string
+  sortOrder?: number
+  status?: number
+  createTime?: string
+  updateTime?: string
+}
+
+/** 组件数据配置（数据集+维度+指标+过滤） */
+export interface ItemDataConfig {
+  /** 数据集ID */
+  datasetId?: string
+  /** 数据集类型 */
+  datasetType?: string
+  /** 选中的维度字段列表 */
+  dimensions?: ItemDimension[]
+  /** 选中的指标字段列表 */
+  metrics?: ItemMetric[]
+  /** 过滤条件 */
+  filters?: ItemFilter[]
+  /** 排序 */
+  sorts?: ItemSort[]
+  /** 数据限制条数 */
+  limit?: number
+  /** 是否启用自定义SQL */
+  useCustomSql?: boolean
+  /** 自定义SQL（SQL数据集模式） */
+  customSql?: string
+}
+
+export interface ItemDimension {
+  fieldCode: string
+  fieldName: string
+  dateFormat?: string
+  sort?: string
+}
+
+export interface ItemMetric {
+  fieldCode: string
+  fieldName: string
+  aggType: string
+  expression?: string
+  format?: string
+  decimalDigits?: number
+}
+
+export interface ItemFilter {
+  fieldCode: string
+  /** EQ / NE / GT / LT / GTE / LTE / IN / NOT_IN / LIKE / BETWEEN / IS_NULL / IS_NOT_NULL */
+  operator: string
+  values?: any[]
+  isVariable?: boolean
+  variableName?: string
+}
+
+export interface ItemSort {
+  fieldCode: string
+  /** ASC / DESC */
+  direction: string
+}
+
+/** 组件样式配置 */
+export interface ItemStyleConfig {
+  title?: TitleStyle
+  legend?: LegendStyle
+  colorTheme?: string
+  bgColor?: string
+  borderRadius?: number
+  borderWidth?: number
+  borderColor?: string
+  showGrid?: boolean
+  labelShow?: boolean
+  labelPosition?: string
+  tooltipShow?: boolean
+  valueFormat?: string
+  decimalDigits?: number
+  xAxis?: AxisStyle
+  yAxis?: AxisStyle
+  padding?: number
+  tableStyle?: TableStyleConfig
+}
+
+export interface TitleStyle {
+  show?: boolean
+  text?: string
+  fontSize?: number
+  /** left / center / right */
+  align?: string
+  color?: string
+  fontWeight?: string
+  subtext?: string
+}
+
+export interface LegendStyle {
+  show?: boolean
+  position?: string
+}
+
+export interface AxisStyle {
+  show?: boolean
+  name?: string
+  fontSize?: number
+  rotate?: number
+}
+
+export interface TableStyleConfig {
+  pageSize?: number
+  showBorder?: boolean
+  stripe?: boolean
+  fitColumn?: boolean
+  fixedHeader?: boolean
+}
+
 export interface VisualDashboard {
   id?: string
   name?: string
@@ -598,6 +770,8 @@ export type ChartType =
   | 'MAP'
   | 'TABLE'
   | 'NUMBER'
+  | 'FUNNEL'
+  | 'RADAR'
 
 export interface VisualDashboardItem {
   id?: string
@@ -607,17 +781,38 @@ export interface VisualDashboardItem {
   title?: string
   /** BAR / LINE / PIE / SCATTER / HEATMAP / AREA / GAUGE / TREEMAP / BOXPLOT / MAP / TABLE / NUMBER */
   chartType?: ChartType
+  /** 兼容旧版：直接数据源ID（推荐使用dataConfig） */
   datasourceId?: string
+  /** 兼容旧版：直接SQL（推荐使用dataConfig.customSql） */
   querySql?: string
+  /** 数据配置(JSON)：数据集+维度+指标+过滤 */
+  dataConfig?: string
+  /** 样式配置(JSON)：标题+图例+颜色主题+边框 */
+  styleConfig?: string
   /** 下钻明细SQL（可选，配置后点击图表下钻） */
   drillSql?: string
-  /** 组件配置(JSON)：xAxisColumn / seriesColumn / valueColumn / mapName 等 */
+  /** 兼容旧版：组件配置(JSON)：xAxisColumn / seriesColumn / valueColumn */
   config?: string
+  /** 组件位置(像素级) */
   posX?: number
   posY?: number
   width?: number
   height?: number
+  /** 组件层级 */
+  zIndex?: number
+  /** 组件样式(前端运行时) */
+  bgColor?: string
+  borderRadius?: number
+  borderWidth?: number
+  borderColor?: string
+  locked?: number
+  visible?: number
   createTime?: string
+  updateTime?: string
+  /** 运行时展开的数据配置对象 */
+  _dataConfigObj?: ItemDataConfig
+  /** 运行时展开的样式配置对象 */
+  _styleConfigObj?: ItemStyleConfig
 }
 
 export interface VisualDashboardVersion {
