@@ -20,6 +20,8 @@ public class DatasetDto implements Serializable {
     /** SQL / MODEL */
     private String datasetType;
     private String datasourceId;
+    /** 数据源类型（MYSQL/HIVE/DORIS 等，资产池展示与联查兼容性判断用） */
+    private String datasourceType;
     private String querySql;
     private String modelId;
     /** 刷新间隔秒 */
@@ -63,5 +65,14 @@ public class DatasetDto implements Serializable {
     public static class DatasetPreviewResult implements Serializable {
         private List<String> columns;
         private List<java.util.Map<String, Object>> rows;
+    }
+
+    /** 图表绘制页查询结果：生成的 SQL + 查询数据 */
+    @Data
+    public static class DatasetChartQueryResult implements Serializable {
+        private String sql;
+        private com.datakhaos.datasource.api.model.QueryResult result;
+        private Boolean truncated;
+        private Integer originalRowCount;
     }
 }

@@ -189,6 +189,12 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '预览仪表板' },
       },
       {
+        path: 'visual/dashboard/chart/:dashboardId/:itemId',
+        name: 'VisualChartBuilder',
+        component: () => import('@/views/visual/dashboard/ChartBuilder.vue'),
+        meta: { title: '图表绘制' },
+      },
+      {
         path: 'visual/adhoc',
         name: 'VisualAdhoc',
         component: () => import('@/views/visual/adhoc/AdhocWorkbench.vue'),

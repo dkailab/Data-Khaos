@@ -136,6 +136,28 @@ public class DatasourceApiClient {
     }
 
     /**
+     * 查询数据源类型（如 MYSQL / HIVE / DORIS），供前端展示数据源徽标与联查兼容性判断。
+     * 数据源服务详情接口返回类型字段 dsType（兼容 type）。
+     */
+    public String datasourceType(String dsId) {
+        try {
+            ResponseEntity<R<Map<String, Object>>> resp = restTemplate.exchange(
+                    SERVICE_URL + "/{id}", HttpMethod.GET, null,
+                    new ParameterizedTypeReference<R<Map<String, Object>>>() {
+                    }, dsId);
+            R<Map<String, Object>> r = resp.getBody();
+            if (r != null && r.getCode() == 0 && r.getData() != null) {
+                Object t = r.getData().get("dsType");
+                if (t == null) t = r.getData().get("type");
+                return t == null ? null : String.valueOf(t).toUpperCase();
+            }
+        } catch (Exception e) {
+            log.warn("查询数据源类型失败: {}", e.getMessage());
+        }
+        return null;
+    }
+
+    /**
      * 在指定数据源上执行 SQL，返回原始 {@link R} 包装（调用方可感知审核 / 执行错误）。
      */
     public R<QueryResult> executeRaw(String dsId, String sql) {

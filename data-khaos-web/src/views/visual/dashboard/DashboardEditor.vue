@@ -238,7 +238,7 @@
               :style="getItemStyle(item)"
               @mousedown.stop="onItemMouseDown($event, item)"
               @click.stop="selectItem(item.id!)"
-              @dblclick.stop="openItemConfig(item)"
+              @dblclick.stop="openChartBuilder(item)"
             >
               <!-- 组件头部拖动条 -->
               <div class="item-header" :class="{ 'has-title': item.title }">
@@ -257,7 +257,7 @@
                 />
                 <div v-else class="item-placeholder">
                   <el-icon :size="28"><component :is="getChartIcon(item.chartType)" /></el-icon>
-                  <span>拖入维度/指标或<a @click.stop="openItemConfig(item)">配置数据源</a></span>
+                  <span>拖入维度/指标或<a @click.stop="openChartBuilder(item)">进入画布绘制</a></span>
                 </div>
               </div>
               <!-- 选中手柄 -->
@@ -273,6 +273,7 @@
               </template>
               <!-- 悬浮操作 -->
               <div v-if="selectedIds.includes(item.id!)" class="item-actions">
+                <el-tooltip content="进入画布绘制"><el-button :icon="EditPen" circle size="small" type="primary" @click.stop="openChartBuilder(item)" /></el-tooltip>
                 <el-tooltip content="配置"><el-button :icon="Setting" circle size="small" @click.stop="openItemConfig(item)" /></el-tooltip>
                 <el-tooltip content="复制"><el-button :icon="CopyDocument" circle size="small" @click.stop="duplicateItem(item)" /></el-tooltip>
                 <el-tooltip content="删除"><el-button :icon="Delete" circle size="small" type="danger" @click.stop="removeItem(item)" /></el-tooltip>
@@ -550,7 +551,7 @@ import { type Component, computed, nextTick, onBeforeUnmount, onMounted, reactiv
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
-  ArrowLeft, Check, CopyDocument, DataAnalysis, DataLine, Delete, Document, Download, Files, FullScreen,
+  ArrowLeft, Check, CopyDocument, DataAnalysis, DataLine, Delete, Document, Download, EditPen, Files, FullScreen,
   Lock, Menu, Moon, Plus, RefreshLeft, RefreshRight, Search, Setting, Sunny, Top, TrendCharts, Unlock, View,
   ZoomIn, ZoomOut, Histogram, PieChart, Grid, Tickets, Odometer,
 } from '@element-plus/icons-vue'
@@ -924,6 +925,27 @@ function duplicateItem(item: VisualDashboardItem) {
 function openItemConfig(item: VisualDashboardItem) {
   selectedIds.value = [item.id!]
   configTab.value = 'data'
+}
+
+/** 进入独立画布绘制页（BI Chart Builder） */
+function openChartBuilder(item: VisualDashboardItem) {
+  const id = item.id || ''
+  if (id.startsWith('item_')) {
+    // 未保存的临时组件：暂存草稿（标题/图表类型/位置尺寸），绘制页保存后生成新组件
+    sessionStorage.setItem(
+      `cb_draft_${dashboardId.value}`,
+      JSON.stringify({
+        title: item.title,
+        chartType: item.chartType,
+        boardId: item.boardId || activeBoardId.value,
+        posX: item.posX, posY: item.posY, width: item.width, height: item.height,
+        dataConfig: item.dataConfig, styleConfig: item.styleConfig,
+      }),
+    )
+    router.push(`/visual/dashboard/chart/${dashboardId.value}/new?boardId=${encodeURIComponent(item.boardId || activeBoardId.value)}`)
+  } else {
+    router.push(`/visual/dashboard/chart/${dashboardId.value}/${id}`)
+  }
 }
 
 function toggleLock(item: VisualDashboardItem) {

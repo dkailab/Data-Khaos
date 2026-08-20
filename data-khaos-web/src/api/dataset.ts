@@ -33,6 +33,8 @@ export interface VisualDataset {
   /** SQL / MODEL */
   datasetType: string
   datasourceId?: string
+  /** 数据源类型（MYSQL/HIVE/DORIS 等，联查兼容性判断用） */
+  datasourceType?: string
   querySql?: string
   modelId?: string
   refreshInterval?: number
@@ -49,6 +51,46 @@ export interface VisualDataset {
 export interface DatasetPreviewResult {
   columns: string[]
   rows: Record<string, any>[]
+}
+
+/* ==================== 图表绘制页（BI Chart Builder） ==================== */
+
+export interface ChartQueryFieldRef {
+  fieldCode: string
+  sort?: string
+}
+
+export interface ChartQueryMetricRef {
+  fieldCode: string
+  aggType?: string
+}
+
+export interface ChartQueryFilterRef {
+  fieldCode: string
+  /** EQ / NE / GT / GTE / LT / LTE / IN / NOT_IN / LIKE / BETWEEN */
+  operator: string
+  values?: string[]
+}
+
+export interface ChartQuerySortRef {
+  fieldCode: string
+  direction: string
+}
+
+export interface DatasetChartQueryRequest {
+  datasetId: string
+  dimensions?: ChartQueryFieldRef[]
+  metrics?: ChartQueryMetricRef[]
+  filters?: ChartQueryFilterRef[]
+  sorts?: ChartQuerySortRef[]
+  limit?: number
+}
+
+export interface DatasetChartQueryResult {
+  sql: string
+  result: import('@/types').QueryResult
+  truncated?: boolean
+  originalRowCount?: number
 }
 
 /* ==================== API ==================== */
@@ -96,4 +138,14 @@ export function previewDataset(datasourceId: string, querySql: string) {
 /** 根据模型提取字段 */
 export function extractFieldsFromModel(modelId: string) {
   return get<DatasetField[]>('/visual/dataset/extract-fields', { modelId })
+}
+
+/** 已发布数据集列表（图表绘制页资产池，含字段定义与数据源类型） */
+export function listPublishedDatasets() {
+  return get<VisualDataset[]>('/visual/dataset/list')
+}
+
+/** 图表聚合查询：数据集 + 维度/指标/筛选/排序 → 服务端生成 SQL 并执行 */
+export function queryDatasetChart(data: DatasetChartQueryRequest) {
+  return post<DatasetChartQueryResult>('/visual/dataset/query', data)
 }

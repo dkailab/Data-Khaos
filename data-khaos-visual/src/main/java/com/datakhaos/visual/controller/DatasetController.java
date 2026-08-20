@@ -92,32 +92,23 @@ public class DatasetController {
         return R.ok(datasetService.extractFieldsFromModel(modelId));
     }
 
+    /**
+     * 已发布数据集列表（图表绘制页资产池，含字段定义与数据源类型）
+     */
+    @GetMapping("/list")
+    public R<java.util.List<DatasetDto>> listPublished() {
+        return R.ok(datasetService.listPublished());
+    }
+
+    /**
+     * 图表聚合查询：数据集 + 维度/指标/筛选/排序 → 生成 SQL 并执行
+     */
+    @PostMapping("/query")
+    public R<DatasetDto.DatasetChartQueryResult> queryChart(@RequestBody com.datakhaos.visual.dto.DatasetChartQueryRequest request) {
+        return R.ok(datasetService.queryChart(request));
+    }
+
     private DatasetDto toDto(VisualDataset entity) {
-        if (entity == null) return null;
-        DatasetDto dto = new DatasetDto();
-        dto.setId(entity.getId());
-        dto.setName(entity.getName());
-        dto.setCode(entity.getCode());
-        dto.setDescription(entity.getDescription());
-        dto.setDatasetType(entity.getDatasetType());
-        dto.setDatasourceId(entity.getDatasourceId());
-        dto.setQuerySql(entity.getQuerySql());
-        dto.setModelId(entity.getModelId());
-        dto.setRefreshInterval(entity.getRefreshInterval());
-        dto.setVisibility(entity.getVisibility());
-        dto.setStatus(entity.getStatus());
-        dto.setVersion(entity.getVersion());
-
-        dto.setFields(datasetService.parseFields(entity.getFieldsJson()));
-        try {
-            if (entity.getVariablesJson() != null) {
-                dto.setVariables(java.util.Arrays.asList(
-                    new com.fasterxml.jackson.databind.ObjectMapper()
-                        .readValue(entity.getVariablesJson(),
-                            com.datakhaos.visual.dto.DatasetDto.DatasetVariableDto[].class)));
-            }
-        } catch (Exception e) { /* ignore */ }
-
-        return dto;
+        return datasetService.toDto(entity);
     }
 }
